@@ -120,7 +120,5 @@ public class Purchase {
 	public void setOperator(User operator) {
 		this.operator = operator;
 	}
-	
-	
-	
+
 }
