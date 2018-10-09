@@ -18,9 +18,9 @@
                 //leaf:true,
                 children:[
                     {
-                        text:'门店管理',
+                        text:'门店/仓库管理',
                         iconCls: 'x-fa fa-link',
-                        viewType: 'admindashboard',
+                        viewType: 'repo',
                         leaf:true
                     },
                     {
@@ -33,6 +33,12 @@
                         text:'品牌管理',
                         iconCls: 'x-fa fa-link',
                         viewType: 'admindashboard',//点击后要显示的页面
+                        leaf:true,
+                    },
+                    {
+                        text:'供货商管理',
+                        iconCls: 'x-fa fa-link',
+                        viewType: 'supplier',//点击后要显示的页面
                         leaf:true,
                     }
                 ]
@@ -70,13 +76,13 @@
                     {
                         text:'销售开单',
                         iconCls: 'x-fa fa-link',
-                        //viewType: 'order',
+                        viewType: 'order',
                         leaf:true
                     },
                     {
                         text:'销售历史管理',
                         iconCls: 'x-fa fa-link',
-                        //viewType: 'order',
+                        viewType: 'order',
                         leaf:true
                     }
                 ]

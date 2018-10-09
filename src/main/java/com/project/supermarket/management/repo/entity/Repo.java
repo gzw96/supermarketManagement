@@ -4,8 +4,6 @@ import java.util.Date;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
-import javax.persistence.EnumType;
-import javax.persistence.Enumerated;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
@@ -13,8 +11,6 @@ import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.project.supermarket.common.bean.Status;
-import com.project.supermarket.common.bean.Type;
 import com.project.supermarket.user.entity.User;
 
 @Entity
@@ -24,11 +20,11 @@ public class Repo {
 	private String repoName;
 	private Date buildDate;
 	private String address;
-	private Integer repoPhone;
+	private String repoPhone;
 	private Long maxSize;
 	private Long minSize;
-	private Status status;
-	private Type type;
+	private String status;
+	private String type;
 	private User user;
 	@Id
 	@GeneratedValue(strategy=GenerationType.IDENTITY)
@@ -50,7 +46,7 @@ public class Repo {
 		return address;
 	}
 
-	public Integer getRepoPhone() {
+	public String getRepoPhone() {
 		return repoPhone;
 	}
 
@@ -64,15 +60,13 @@ public class Repo {
 		return minSize;
 	}
 
-	@Enumerated(EnumType.STRING)
 	@Column(nullable=false)
-	public Status getStatus() {
+	public String getStatus() {
 		return status;
 	}
 
-	@Enumerated(EnumType.STRING)
 	@Column(nullable=false)
-	public Type getType() {
+	public String getType() {
 		return type;
 	}
 
@@ -101,7 +95,7 @@ public class Repo {
 		this.address = address;
 	}
 
-	public void setRepoPhone(Integer repoPhone) {
+	public void setRepoPhone(String repoPhone) {
 		this.repoPhone = repoPhone;
 	}
 
@@ -113,11 +107,11 @@ public class Repo {
 		this.minSize = minSize;
 	}
 
-	public void setStatus(Status status) {
+	public void setStatus(String status) {
 		this.status = status;
 	}
 
-	public void setType(Type type) {
+	public void setType(String type) {
 		this.type = type;
 	}
 

@@ -2,6 +2,8 @@ package com.project.supermarket.management.supplier.entity;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
@@ -15,12 +17,12 @@ public class Supplier {
 	private Long id;
 	private String supplierName;
 	private String supplierPeople;
-	private Long supplierPhone;
+	private String supplierPhone;
 	private String bankAccount;
 	private String bankName;
 	private String address;
 	private String remark;
-	private Status status;
+	private String status;
 	
 	@Id
 	@GeneratedValue(strategy=GenerationType.IDENTITY)
@@ -36,7 +38,7 @@ public class Supplier {
 		return supplierPeople;
 	}
 	@Column(nullable=false)
-	public Long getSupplierPhone() {
+	public String getSupplierPhone() {
 		return supplierPhone;
 	}
 	@Column(nullable=false)
@@ -52,8 +54,9 @@ public class Supplier {
 	public String getRemark() {
 		return remark;
 	}
+	
 	@Column(nullable=false)
-	public Status getStatus() {
+	public String getStatus() {
 		return status;
 	}
 	
@@ -69,7 +72,7 @@ public class Supplier {
 	public void setSupplierPeople(String supplierPeople) {
 		this.supplierPeople = supplierPeople;
 	}
-	public void setSupplierPhone(Long supplierPhone) {
+	public void setSupplierPhone(String supplierPhone) {
 		this.supplierPhone = supplierPhone;
 	}
 	public void setBankAccount(String bankAccount) {
@@ -84,10 +87,8 @@ public class Supplier {
 	public void setRemark(String remark) {
 		this.remark = remark;
 	}
-	public void setStatus(Status status) {
+	public void setStatus(String status) {
 		this.status = status;
 	}
-	
-	//setter
-	
+
 }
