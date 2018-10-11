@@ -74,14 +74,14 @@ public class RepoController {
 		}
 	}
 	
-	/*@PostMapping("/getUninit")
-	public Page<Repo> getUninit() 
+	@GetMapping("/getUninit")
+	public Page<RepoQueryDTO> getUninit(ExtjsPageRequest pageable) 
 	{
-		Repo repo=new Repo();
-		Page<Repo> page=productService.findAll(productService.moresearch(product, toSubmit), pageable.getPageable());
+		RepoQueryDTO dto=new RepoQueryDTO();
+		Page<RepoQueryDTO> page=repoService.findAll(repoService.getNeedinit(), pageable.getPageable());
 		return 	page;
 	}
-	*/
+	
 	@PutMapping(value="{id}",consumes=MediaType.APPLICATION_JSON_VALUE)
 	public ExtAjaxResponse update(@PathVariable("id") Long myId,@RequestBody RepoQueryDTO dto) {//修改
 		try {
@@ -115,14 +115,14 @@ public class RepoController {
 			Long uId;
 			uId = repoService.getRepoUserId(uName, num);
 			
-	        System.out.println(uId);
+	        //System.out.println(uId);
 	        
 	        repo.setRoleId(uId);
 			Repo repo1 = new Repo();
 			repo.dtoToEntity(repo, repo1);
 			String repoName = repo.getRepoName();
 			
-			System.out.println(repoName);
+			//System.out.println(repoName);
 			
 			Repo newrepo = new Repo();
 			BeanUtils.copyProperties(repo1, newrepo);

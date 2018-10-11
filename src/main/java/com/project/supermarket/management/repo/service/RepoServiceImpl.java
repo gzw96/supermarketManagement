@@ -20,10 +20,11 @@ public interface RepoServiceImpl {
 	public long count();
 	public void deleteById(Long id);
 	public Page<RepoQueryDTO> findAll(Specification<RepoQueryDTO> spec, Pageable pageable);
+
 	
 	public void deleteAll(Long[] ids);
 	
-	//public Specification<Repo> getNeedinit() ;
+	public Specification<RepoQueryDTO> getNeedinit() ;
 	//hql查询
 	public Long getRepoUserId(String userName,Long workNum);
 	public void  findUserById(Long userid,String repoName);

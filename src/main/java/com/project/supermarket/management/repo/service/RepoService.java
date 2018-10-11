@@ -63,7 +63,8 @@ public class RepoService implements RepoServiceImpl{
 		// TODO Auto-generated method stub
 		return repoRepository.findAll(spec, pageable);
 	}
-
+	
+	
 	@Override
 	public void deleteAll(Long[] ids) {
 		// TODO Auto-generated method stub
@@ -98,17 +99,17 @@ public class RepoService implements RepoServiceImpl{
 		return repoRepository.findAllActiveUserRealName();
 	}
 
-	/*@Override
-	public Specification<Repo> getNeedinit() {
-		return new Specification<Repo>() {
+	@Override
+	public Specification<RepoQueryDTO> getNeedinit() {
+		return new Specification<RepoQueryDTO>() {
 			@Override
-			public Predicate toPredicate(Root<Repo> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) {
+			public Predicate toPredicate(Root<RepoQueryDTO> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) {
 				List<Predicate> predicate = new ArrayList<>();
-				predicate.add(criteriaBuilder.equal(root.get("id").as(String.class),toSubmit[1]));
+				predicate.add(criteriaBuilder.isNull(root.get("stock")));
 				Predicate[] pre = new Predicate[predicate.size()];
 				return query.where(predicate.toArray(pre)).getRestriction();
 			}
 		};
-	}*/
+	}
 	
 }

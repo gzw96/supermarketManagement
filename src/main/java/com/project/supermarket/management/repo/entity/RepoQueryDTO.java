@@ -38,6 +38,7 @@ public class RepoQueryDTO {
 	private String type;
 	
 	private Long roleId;
+	//private Long stockId;
 	private Long workNum;
 	private String userRealName;
 	
@@ -177,6 +178,12 @@ public class RepoQueryDTO {
 		this.userRealName = userRealName;
 	}
 	
+	/*public Long getStockId() {
+		return stockId;
+	}
+	public void setStockId(Long stockId) {
+		this.stockId = stockId;
+	}*/
 	@SuppressWarnings({"serial"})
 	public static Specification<RepoQueryDTO> getWhereClause(final RepoQueryDTO repoQueryDTO){
 		return new Specification<RepoQueryDTO>() {
