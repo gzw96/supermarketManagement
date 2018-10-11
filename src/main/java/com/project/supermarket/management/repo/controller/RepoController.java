@@ -25,6 +25,7 @@ import com.alibaba.fastjson.JSON;
 import com.project.supermarket.common.util.BeanUtils;
 import com.project.supermarket.common.web.ExtAjaxResponse;
 import com.project.supermarket.common.web.ExtjsPageRequest;
+import com.project.supermarket.management.product.entity.Product;
 import com.project.supermarket.management.repo.entity.Repo;
 import com.project.supermarket.management.repo.entity.RepoQueryDTO;
 import com.project.supermarket.management.repo.service.RepoServiceImpl;
@@ -73,6 +74,14 @@ public class RepoController {
 		}
 	}
 	
+	/*@PostMapping("/getUninit")
+	public Page<Repo> getUninit() 
+	{
+		Repo repo=new Repo();
+		Page<Repo> page=productService.findAll(productService.moresearch(product, toSubmit), pageable.getPageable());
+		return 	page;
+	}
+	*/
 	@PutMapping(value="{id}",consumes=MediaType.APPLICATION_JSON_VALUE)
 	public ExtAjaxResponse update(@PathVariable("id") Long myId,@RequestBody RepoQueryDTO dto) {//修改
 		try {

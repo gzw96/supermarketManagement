@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
+import com.project.supermarket.management.product.entity.Product;
 import com.project.supermarket.management.repo.entity.Repo;
 import com.project.supermarket.management.repo.entity.RepoQueryDTO;
 import com.project.supermarket.user.entity.User;
@@ -22,7 +23,7 @@ public interface RepoServiceImpl {
 	
 	public void deleteAll(Long[] ids);
 	
-	
+	//public Specification<Repo> getNeedinit() ;
 	//hql查询
 	public Long getRepoUserId(String userName,Long workNum);
 	public void  findUserById(Long userid,String repoName);

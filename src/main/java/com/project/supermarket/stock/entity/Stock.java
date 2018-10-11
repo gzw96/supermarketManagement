@@ -32,7 +32,7 @@ public class Stock {
 	@Id
     @GeneratedValue(strategy=GenerationType.IDENTITY)
 	private Long id;
-	@OneToOne(cascade= {CascadeType.MERGE,CascadeType.REFRESH})
+	@OneToOne(cascade= {CascadeType.MERGE,CascadeType.REFRESH,CascadeType.PERSIST})
 	private Repo repository;
 	private int stockNum;
 	@Temporal(TemporalType.TIMESTAMP)

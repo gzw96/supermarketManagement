@@ -5,12 +5,18 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+import com.project.supermarket.management.product.entity.Product;
 import com.project.supermarket.management.repo.entity.Repo;
 import com.project.supermarket.management.repo.entity.RepoQueryDTO;
 import com.project.supermarket.management.repo.repository.RepoRepository;
@@ -92,4 +98,17 @@ public class RepoService implements RepoServiceImpl{
 		return repoRepository.findAllActiveUserRealName();
 	}
 
+	/*@Override
+	public Specification<Repo> getNeedinit() {
+		return new Specification<Repo>() {
+			@Override
+			public Predicate toPredicate(Root<Repo> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) {
+				List<Predicate> predicate = new ArrayList<>();
+				predicate.add(criteriaBuilder.equal(root.get("id").as(String.class),toSubmit[1]));
+				Predicate[] pre = new Predicate[predicate.size()];
+				return query.where(predicate.toArray(pre)).getRestriction();
+			}
+		};
+	}*/
+	
 }
