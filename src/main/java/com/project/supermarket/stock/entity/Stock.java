@@ -23,11 +23,13 @@ import javax.persistence.TemporalType;
 
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.project.supermarket.management.repo.entity.Repo;
 
 
 @Entity
 @Table(name="stock")
+@JsonIgnoreProperties(value={"repository"})
 public class Stock {
 	@Id
     @GeneratedValue(strategy=GenerationType.IDENTITY)
