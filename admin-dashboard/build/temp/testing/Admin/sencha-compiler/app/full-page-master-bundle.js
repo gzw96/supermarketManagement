@@ -1,2 +1,2 @@
 // @tag full-page
-// @require F:\springboot\supermarket\admin-dashboard\app.js
+// @require C:\Users\Administrator\git\supermarketManagement\admin-dashboard\app.js

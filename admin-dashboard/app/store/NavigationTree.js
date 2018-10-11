@@ -26,13 +26,13 @@
                     {
                         text:'商品管理',
                         iconCls: 'x-fa fa-link',
-                        viewType: 'admindashboard',
+                        viewType: 'productPanel',
                         leaf:true
                     },
                     {
                         text:'品牌管理',
                         iconCls: 'x-fa fa-link',
-                        viewType: 'admindashboard',//点击后要显示的页面
+                        viewType: 'brandPanel',//点击后要显示的页面
                         leaf:true,
                     },
                     {

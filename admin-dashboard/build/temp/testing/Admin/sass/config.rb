@@ -1,1 +1,1 @@
-cache_path = 'F:\springboot\supermarket\admin-dashboard/build/.sass-cache'
+cache_path = 'C:\Users\Administrator\git\supermarketManagement\admin-dashboard/build/.sass-cache'
