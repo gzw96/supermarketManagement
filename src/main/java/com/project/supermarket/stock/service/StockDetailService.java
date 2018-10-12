@@ -62,14 +62,52 @@ public class StockDetailService implements IStockDetailService {
 	public void save(String []toSubmit) {
 		String []proId=toSubmit[1].split(",");
 		String []proNum=toSubmit[0].split(",");	
+		int count=0;
 		Stock stock=stockRepository.findOne(findstock(toSubmit)).get();
-		for(int i=0;i<proId.length;i++) {
-			StockDetail stockDetail=new StockDetail();
-			stockDetail.setStock(stock);
-			stockDetail.setNum(Integer.parseInt(proNum[i]));
-			Product product=productRepository.findById(Long.parseLong(proId[i])).get();
-			stockDetail.setProduct(product);
-			stockDetailRepository.save(stockDetail);
+		List<StockDetail> list=stockDetailRepository.findAll(findstockDetail(stock.getId()));
+		if(list.isEmpty()==true) {
+			for(int i=0;i<proId.length;i++) {
+				
+				StockDetail stockDetail=new StockDetail();
+				stockDetail.setStock(stock);
+				stockDetail.setNum(Integer.parseInt(proNum[i]));
+				Product product=productRepository.findById(Long.parseLong(proId[i])).get();
+				stockDetail.setProduct(product);
+				stockDetailRepository.save(stockDetail);
+				count=count+Integer.parseInt(proNum[i]);
+			}
+			stock.setStockNum(count);
+			stockRepository.save(stock);
+		}else if(!list.isEmpty()) {
+			for(int j=0;j<proId.length;j++) {
+				int flag=0;
+				for(int i=0;i<list.size();i++)  {
+					if(Long.parseLong(proId[j])!=list.get(i).getProduct().getId()) {
+						flag++;
+						if(flag==list.size()) {
+							
+							StockDetail stockDetail=new StockDetail();
+							stockDetail.setStock(stock);
+							stockDetail.setNum(Integer.parseInt(proNum[j]));
+							Product product=productRepository.findById(Long.parseLong(proId[j])).get();
+							stockDetail.setProduct(product);
+							stockDetailRepository.save(stockDetail);
+							count=stock.getStockNum()+Integer.parseInt(proNum[j]);
+							stock.setStockNum(count);
+							stockRepository.save(stock);
+						}
+					}else {
+						
+						int countpro=list.get(i).getNum()+Integer.parseInt(proNum[j]);
+						StockDetail stockDetail=list.get(i);
+						stockDetail.setNum(countpro);
+						stockDetailRepository.save(stockDetail);
+						count=stock.getStockNum()+Integer.parseInt(proNum[j]);
+						stock.setStockNum(count);
+						stockRepository.save(stock);
+					}
+				}
+			}
 		}
 		
 	}
@@ -165,6 +203,17 @@ public class StockDetailService implements IStockDetailService {
 		};
 	}
 	
+	public Specification<StockDetail> findstockDetail(Long id) {
+		return new Specification<StockDetail>() {
+			@Override
+			public Predicate toPredicate(Root<StockDetail> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) {
+				List<Predicate> predicate = new ArrayList<>();
+				predicate.add(criteriaBuilder.equal(root.join("stock").get("id").as(Long.class),id));
+				Predicate[] pre = new Predicate[predicate.size()];
+				return query.where(predicate.toArray(pre)).getRestriction();
+			}
+		};
+	}
 	/*@Override
 	public Page<Stock> findAll(Specification<Stock> spec, Pageable pageable){
 		return stockRepository.findAll(spec, pageable);

@@ -33,7 +33,7 @@ public class StockDetail {
     @GeneratedValue(strategy=GenerationType.IDENTITY)
 	private Long id;
 	
-	@ManyToOne(cascade= {CascadeType.ALL})
+	@ManyToOne(cascade= {CascadeType.REFRESH,CascadeType.MERGE})
 	private Stock stock;
 	
 	@ManyToOne(cascade= {CascadeType.MERGE,CascadeType.REFRESH})

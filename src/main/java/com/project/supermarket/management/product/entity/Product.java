@@ -40,7 +40,7 @@ public class Product{
     @JsonFormat(pattern="yyyy-MM-dd HH:mm:ss",timezone="GMT+8")
 	private Date updateTime;				//最后一次修改时间
 	
-	@ManyToMany(cascade= {CascadeType.MERGE,CascadeType.REFRESH} ,mappedBy="product",fetch=FetchType.LAZY)
+	@OneToMany(cascade= {CascadeType.MERGE,CascadeType.REFRESH} ,mappedBy="product",fetch=FetchType.LAZY)
 	private Set<StockDetail> stockDetail = new HashSet<StockDetail>();//外键,多对多 
 	
 	@ManyToOne(cascade= {CascadeType.MERGE,CascadeType.REFRESH}) 
