@@ -29,6 +29,7 @@ public class RepoQueryDTO {
 	private static RepoServiceImpl repoService;
 	//显示的信息
 	private String repoName;
+	private Long id;
 	private Date buildDate;
 	private String address;
 	private String repoPhone;
@@ -72,6 +73,7 @@ public class RepoQueryDTO {
 		repo.setRepoPhone(dto.getRepoPhone());
 		repo.setStatus(dto.getStatus());
 		repo.setType(dto.getType());
+		repo.setId(dto.getId());
 		
 	}
 	public static void entityToDto(Repo repo , RepoQueryDTO dto) {
@@ -109,6 +111,12 @@ public class RepoQueryDTO {
 		return dto;
 	}
 	
+	public Long getId() {
+		return id;
+	}
+	public void setId(Long id) {
+		this.id = id;
+	}
 	public String getRepoName() {
 		return repoName;
 	}

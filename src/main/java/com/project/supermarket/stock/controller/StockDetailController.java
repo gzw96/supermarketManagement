@@ -1,12 +1,12 @@
-package com.project.supermarket.management.product.controller;
+package com.project.supermarket.stock.controller;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+
+
+
+
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -21,47 +21,39 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.project.supermarket.common.util.BeanUtils;
 import com.project.supermarket.common.web.ExtAjaxResponse;
 import com.project.supermarket.common.web.ExtjsPageRequest;
-import com.project.supermarket.management.product.entity.Product;
-import com.project.supermarket.management.product.service.IProductService;
-import com.project.supermarket.management.repo.entity.Repo;
-import com.project.supermarket.management.repo.entity.RepoQueryDTO;
+import com.project.supermarket.stock.entity.Stock;
+import com.project.supermarket.stock.service.StockDetailService;
+import com.project.supermarket.stock.service.StockService;
+
 
 
 
 
 
 @RestController
-@RequestMapping(value="/product")
-public class ProductController 
+@RequestMapping(value="/stockDetail")
+public class StockDetailController 
 {
 	@Autowired
-	private IProductService productService;
+	private StockDetailService stockDetailService;
 	
-	@PostMapping
-    public ExtAjaxResponse save(@RequestBody Product product) {
+	@RequestMapping(value = "/save")
+    public void save(@RequestParam(name="toSubmit") String[] toSubmit) {
 		
-    	try {
-    		
-    		productService.save(product);
-    		
-    		return new ExtAjaxResponse(true,"保存成功!");
-	    } catch (Exception e) {
-	    	e.printStackTrace();
-	        return new ExtAjaxResponse(false,"保存失败!");
-	    }
+		stockDetailService.save(toSubmit);
+    	
     }
 	
-	@RequestMapping(value = "/upload")
-    public @ResponseBody ExtAjaxResponse deploy(@RequestParam(value = "productPrice") Double productPrice,@RequestParam(value = "status") String status,@RequestParam(value = "getBrandName") String getBrandName,@RequestParam(value = "id") Long id,@RequestParam(value = "productName") String productName,@RequestParam(value = "productImg") MultipartFile file) {
+	/*@RequestMapping(value = "/upload")
+    public @ResponseBody ExtAjaxResponse deploy(@RequestParam(value = "stockPrice") Double stockPrice,@RequestParam(value = "status") String status,@RequestParam(value = "getBrandName") String getBrandName,@RequestParam(value = "id") Long id,@RequestParam(value = "stockName") String stockName,@RequestParam(value = "stockImg") MultipartFile file) {
         try {
         	long l=Long.parseLong(getBrandName);
         	SimpleDateFormat fromat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss"); 
         	Date today=new Date();
         	today=fromat.parse(fromat.format(today));
-        	Product entity = productService.findOne(id);
+        	Stock entity = stockService.findOne(id);
         	String fileName = file.getOriginalFilename();
         	String realPath = System.getProperty("user.dir");
     		String filePath = realPath+"\\src\\main\\webapp\\resources\\images\\";
@@ -70,12 +62,12 @@ public class ProductController
     		file.transferTo(dest);
     		if(entity!=null) {
 				entity.setUpdateTime(today);
-				entity.setProductImg(fileName);
-				entity.setProductPrice(productPrice);
+				entity.setStockImg(fileName);
+				entity.setStockPrice(stockPrice);
 				entity.setStatus(status);
-				entity.setProductName(productName);
+				entity.setStockName(stockName);
 				entity.setGetBrandName(l);
-				productService.save(entity);
+				stockService.save(entity);
 			}
     		return new ExtAjaxResponse(true,"更新成功!");
         } catch (Exception e) {
@@ -85,39 +77,25 @@ public class ProductController
     }
 	
 	@RequestMapping(value = "/quicksearch")
-    public Page<Product>  quicksearch(@RequestParam(value = "myArray") String myArray[],ExtjsPageRequest pageable) {
-		Product product=new Product();
-		Page<Product> page=productService.findAll(productService.findQuick(product, myArray), pageable.getPageable());
+    public Page<Stock>  quicksearch(@RequestParam(value = "myArray") String myArray[],ExtjsPageRequest pageable) {
+		Stock stock=new Stock();
+		Page<Stock> page=stockService.findAll(stockService.findQuick(stock, myArray), pageable.getPageable());
 		return 	page;
     }
 	
-	@RequestMapping(value = "/getProduct")
-	public List<Product> getProduct() 
-	{
-		List<Product> resList = productService.findAll();	
-		List list = new ArrayList();
-		for(int i=0;i<resList.size();i++) {
-			Map<String,Object> map1=new HashMap<String, Object>();
-			map1.put("value",resList.get(i).getId() );
-			map1.put("name", resList.get(i).getProductName());
-			list.add(map1);
-		}
-		return list;
-	}
-	
 	@RequestMapping(value = "/moresearch")
-    public Page<Product>  moresearch(@RequestParam(value = "toSubmit") String toSubmit[],ExtjsPageRequest pageable) {
-		Product product=new Product();
-		Page<Product> page=productService.findAll(productService.moresearch(product, toSubmit), pageable.getPageable());
+    public Page<Stock>  moresearch(@RequestParam(value = "toSubmit") String toSubmit[],ExtjsPageRequest pageable) {
+		Stock stock=new Stock();
+		Page<Stock> page=stockService.findAll(stockService.moresearch(stock, toSubmit), pageable.getPageable());
 		return 	page;
     }
 	
 	@DeleteMapping(value="{id}")
     public @ResponseBody ExtAjaxResponse delete(@PathVariable("id") Long id) {
     	try {
-    		Product entity = productService.findOne(id);
+    		Stock entity = stockService.findOne(id);
 			if(entity!=null) {
-				productService.delete(id);
+				stockService.delete(id);
 			}
     		return new ExtAjaxResponse(true,"删除成功!");
 	    } catch (Exception e) {
@@ -132,7 +110,7 @@ public class ProductController
 	{
 		try {
 			if(ids!=null) {
-				productService.deleteAll(ids);
+				stockService.deleteAll(ids);
 			}
 			return new ExtAjaxResponse(true,"批量删除成功！");
 		} catch (Exception e) {
@@ -141,9 +119,9 @@ public class ProductController
 	}
 	
 	@GetMapping
-    public Page<Product> findPage(ExtjsPageRequest pageable) 
+    public Page<Stock> findPage(ExtjsPageRequest pageable) 
 	{
-		Page<Product> page =  productService.findAll(pageable.getPageable());
+		Page<Stock> page =  stockService.findAll(pageable.getPageable());
 		return page;
     }
 	

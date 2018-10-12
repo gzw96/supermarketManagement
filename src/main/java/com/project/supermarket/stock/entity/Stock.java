@@ -40,7 +40,7 @@ public class Stock {
 	@Temporal(TemporalType.TIMESTAMP)
     @JsonFormat(pattern="yyyy-MM-dd HH:mm:ss",timezone="GMT+8")
 	private Date updateDate;
-	@OneToMany(cascade= {CascadeType.MERGE,CascadeType.REFRESH},mappedBy="stock")
+	@OneToMany(cascade= {CascadeType.ALL},mappedBy="stock")
 	private Set<StockDetail> stockDetail = new HashSet<StockDetail>();//外键,一对多 
 
 	

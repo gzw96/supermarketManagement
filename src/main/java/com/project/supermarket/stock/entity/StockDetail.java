@@ -33,11 +33,11 @@ public class StockDetail {
     @GeneratedValue(strategy=GenerationType.IDENTITY)
 	private Long id;
 	
-	@ManyToOne(cascade= {CascadeType.MERGE,CascadeType.REFRESH})
+	@ManyToOne(cascade= {CascadeType.ALL})
 	private Stock stock;
 	
-	@ManyToMany(cascade= {CascadeType.MERGE,CascadeType.REFRESH})
-	private Set<Product> product=new HashSet<Product>();
+	@ManyToOne(cascade= {CascadeType.MERGE,CascadeType.REFRESH})
+	private Product product=new Product();
 	
 	private int num;   //商品数量
 
@@ -50,7 +50,7 @@ public class StockDetail {
 		return stock;
 	}
 
-	public Set<Product> getProduct() {
+	public Product getProduct() {
 		return product;
 	}
 
@@ -67,7 +67,7 @@ public class StockDetail {
 		this.stock = stock;
 	}
 
-	public void setProduct(Set<Product> product) {
+	public void setProduct(Product product) {
 		this.product = product;
 	}
 

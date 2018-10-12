@@ -1,4 +1,4 @@
-package com.project.supermarket.management.product.service;
+package com.project.supermarket.stock.service;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -29,103 +29,112 @@ import com.project.supermarket.management.brand.dao.BrandRepository;
 import com.project.supermarket.management.brand.entity.Brand;
 import com.project.supermarket.management.product.dao.ProductRepository;
 import com.project.supermarket.management.product.entity.Product;
+import com.project.supermarket.management.repo.entity.Repo;
+import com.project.supermarket.management.repo.repository.RepoRepository;
+import com.project.supermarket.management.repo.service.RepoService;
+import com.project.supermarket.stock.dao.StockDetailRepository;
+import com.project.supermarket.stock.dao.StockRepository;
+import com.project.supermarket.stock.entity.Stock;
+import com.project.supermarket.stock.entity.StockDetail;
 
 
 
 @Service
 @Transactional
-public class ProductService implements IProductService {
+public class StockDetailService implements IStockDetailService {
 
+	@Autowired
+	private StockRepository stockRepository;
+	
+	@Autowired
+	private RepoRepository repoRepository;
+	
+	@Autowired
+	private StockDetailRepository stockDetailRepository;
+	
 	@Autowired
 	private ProductRepository productRepository;
 	
-	@Autowired
-	private BrandRepository brandRepository;
+	/*@Autowired
+	private RepoService repoService;*/
 	
 	@Override
-	public void save(Product product) {
-		String val="";
-		Random random=new Random();
-		for(int i=0;i<8;i++) {
-			String charOrNum = random.nextInt(2) % 2 == 0 ? "char" : "num"; 
-			 if( "char".equalsIgnoreCase(charOrNum) ) {  
-				 int temp = random.nextInt(2) % 2 == 0 ? 65 : 97;  
-	             val += (char)(random.nextInt(26) + temp);  
-			 }else if( "num".equalsIgnoreCase(charOrNum) ) {  
-	                val += String.valueOf(random.nextInt(10));  
-	         } 
+	public void save(String []toSubmit) {
+		String []proId=toSubmit[1].split(",");
+		String []proNum=toSubmit[0].split(",");	
+		Stock stock=stockRepository.findOne(findstock(toSubmit)).get();
+		for(int i=0;i<proId.length;i++) {
+			StockDetail stockDetail=new StockDetail();
+			stockDetail.setStock(stock);
+			stockDetail.setNum(Integer.parseInt(proNum[i]));
+			Product product=productRepository.findById(Long.parseLong(proId[i])).get();
+			stockDetail.setProduct(product);
+			stockDetailRepository.save(stockDetail);
 		}
-		product.setProductNum(val);
-		Brand brand=new Brand();
-		brand=brandRepository.findById(product.getGetBrandName()).get();
-		product.setBrand(brand);
-		productRepository.save(product);
+		
 	}
 
-	@Override
+	/*@Override
 	public void delete(Long id) {
-		Product product = productRepository.findById(id).get();
-		if(product!=null){
-			productRepository.delete(product);
+		Stock stock = stockRepository.findById(id).get();
+		if(stock!=null){
+			stockRepository.delete(stock);
 		}
 	}
 	
-	@Override
-	public List<Product> findAll(){
-		return (List<Product>) productRepository.findAll();
-	}
+
 	
 	@Override
 	public void deleteAll(Long[] ids) {
 		List<Long> idLists = new ArrayList<Long>(Arrays.asList(ids));
 		
-		List<Product> product = (List<Product>) productRepository.findAllById(idLists);
-		if(product!=null) {
-			productRepository.deleteAll(product);
+		List<Stock> stock = (List<Stock>) stockRepository.findAllById(idLists);
+		if(stock!=null) {
+			stockRepository.deleteAll(stock);
 		}
 	}
 	
 	@Override
-	public Product findOne(Long id) {
-		return productRepository.findById(id).get();
+	public Stock findOne(Long id) {
+		return stockRepository.findById(id).get();
 	}
 
 	
 	@Override
-	public Page<Product> findAll(Pageable pageable) {
+	public Page<Stock> findAll(Pageable pageable) {
 		
-		Page<Product> entityPage = productRepository.findAll(pageable);
-		List<Product> entityLists = entityPage.getContent();
+		Page<Stock> entityPage = stockRepository.findAll(pageable);
+		List<Stock> entityLists = entityPage.getContent();
 		/*List list = new ArrayList();
 		SimpleDateFormat fromat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss"); 
 		for(int i=0;i<entityLists.size();i++) {
 			Map<String,Object> map=new HashMap<String, Object>();
 	        map.put("createTime", fromat.format(entityLists.get(i).getCreateTime()));
 	        map.put("updateTime", fromat.format(entityLists.get(i).getUpdateTime()));
-	        map.put("productImg", entityLists.get(i).getProductImg());
-	        map.put("productName", entityLists.get(i).getProductName());
-	        map.put("productPrice", entityLists.get(i).getProductPrice());
-	        map.put("productNum", entityLists.get(i).getProductNum());
+	        map.put("stockImg", entityLists.get(i).getStockImg());
+	        map.put("stockName", entityLists.get(i).getStockName());
+	        map.put("stockPrice", entityLists.get(i).getStockPrice());
+	        map.put("stockNum", entityLists.get(i).getStockNum());
 	        map.put("status", entityLists.get(i).getStatus());
 	        map.put("brandName", entityLists.get(i).getBrand().getBrandName());
 	        map.put("brandName1", entityLists.get(i).getBrand().getId());
 	        map.put("id", entityLists.get(i).getId());
 	        list.add(map);
 		}*/
-		return new PageImpl<Product>(entityLists, pageable, entityPage.getTotalElements());
+		/*return new PageImpl<Stock>(entityLists, pageable, entityPage.getTotalElements());
 		
 	}
 	
-	public Specification<Product> findQuick(final Product product,String myArray[]) {
-		return new Specification<Product>() {
+	public Specification<Stock> findQuick(final Stock stock,String myArray[]) {
+		return new Specification<Stock>() {
 			@Override
-			public Predicate toPredicate(Root<Product> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) {
+			public Predicate toPredicate(Root<Stock> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) {
 				List<Predicate> predicate = new ArrayList<>();
 				try {
 					System.out.println(myArray[0]);
 					System.out.println(myArray[1]);
 					System.out.println(myArray[2]);
-					if(myArray[2].equals("productPrice")) {
+					if(myArray[2].equals("stockPrice")) {
 						predicate.add(criteriaBuilder.greaterThanOrEqualTo(root.get(myArray[2]).as(Double.class),Double.parseDouble(myArray[0])));
 						predicate.add(criteriaBuilder.lessThanOrEqualTo(root.get(myArray[2]).as(Double.class),Double.parseDouble(myArray[1])));
 					}else {
@@ -142,33 +151,29 @@ public class ProductService implements IProductService {
 				return query.where(predicate.toArray(pre)).getRestriction();
 			}
 		};
-	}
+	}*/
 	
-	public Specification<Product> moresearch(final Product product,String toSubmit[]) {
-		return new Specification<Product>() {
+	public Specification<Stock> findstock(String toSubmit[]) {
+		return new Specification<Stock>() {
 			@Override
-			public Predicate toPredicate(Root<Product> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) {
+			public Predicate toPredicate(Root<Stock> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) {
 				List<Predicate> predicate = new ArrayList<>();
-				if(toSubmit[0].equals("getBrandName")) {
-					predicate.add(criteriaBuilder.equal(root.join("brand").get("id").as(String.class),toSubmit[1]));
-				}else {
-					predicate.add(criteriaBuilder.equal(root.get(toSubmit[0]).as(String.class),toSubmit[1]));
-				}
+				predicate.add(criteriaBuilder.equal(root.join("repository").get("id").as(Long.class),Long.parseLong(toSubmit[2])));
 				Predicate[] pre = new Predicate[predicate.size()];
 				return query.where(predicate.toArray(pre)).getRestriction();
 			}
 		};
 	}
 	
-	@Override
-	public Page<Product> findAll(Specification<Product> spec, Pageable pageable){
-		return productRepository.findAll(spec, pageable);
+	/*@Override
+	public Page<Stock> findAll(Specification<Stock> spec, Pageable pageable){
+		return stockRepository.findAll(spec, pageable);
 	}
 	
 	
 	/*@Override
-	public List<product> findQuick(String date1,String date2) {
-		return productRepository.findQuick(date1, date2);
+	public List<stock> findQuick(String date1,String date2) {
+		return stockRepository.findQuick(date1, date2);
 		
 	}*/
 }
