@@ -63,7 +63,7 @@ public class StockDetailService implements IStockDetailService {
 		String []proId=toSubmit[1].split(",");
 		String []proNum=toSubmit[0].split(",");	
 		int count=0;
-		Stock stock=stockRepository.findOne(findstock(toSubmit)).get();
+		Stock stock=stockRepository.findOne(findstock(toSubmit[2])).get();
 		List<StockDetail> list=stockDetailRepository.findAll(findstockDetail(stock.getId()));
 		if(list.isEmpty()==true) {
 			for(int i=0;i<proId.length;i++) {
@@ -97,7 +97,6 @@ public class StockDetailService implements IStockDetailService {
 							stockRepository.save(stock);
 						}
 					}else {
-						
 						int countpro=list.get(i).getNum()+Integer.parseInt(proNum[j]);
 						StockDetail stockDetail=list.get(i);
 						stockDetail.setNum(countpro);
@@ -109,6 +108,25 @@ public class StockDetailService implements IStockDetailService {
 				}
 			}
 		}
+		
+	}
+	
+	
+	@Override
+	public List<String> findAll(String repoid){
+		Stock stock=stockRepository.findOne(findstock(repoid)).get();
+		List<StockDetail> list=stockDetailRepository.findAll(findstockDetail(stock.getId()));
+		List finalList = new ArrayList();
+		if(!list.isEmpty()) {
+			for(int i=0;i<list.size();i++) {
+				Map<String,Object> map1=new HashMap<String, Object>();
+				map1.put("value",list.get(i).getProduct().getId() );
+				map1.put("name", list.get(i).getProduct().getProductName());
+				finalList.add(map1);
+				
+			}	
+		}
+		return finalList;
 		
 	}
 
@@ -191,12 +209,12 @@ public class StockDetailService implements IStockDetailService {
 		};
 	}*/
 	
-	public Specification<Stock> findstock(String toSubmit[]) {
+	public Specification<Stock> findstock(String toSubmit) {
 		return new Specification<Stock>() {
 			@Override
 			public Predicate toPredicate(Root<Stock> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) {
 				List<Predicate> predicate = new ArrayList<>();
-				predicate.add(criteriaBuilder.equal(root.join("repository").get("id").as(Long.class),Long.parseLong(toSubmit[2])));
+				predicate.add(criteriaBuilder.equal(root.join("repository").get("id").as(Long.class),Long.parseLong(toSubmit)));
 				Predicate[] pre = new Predicate[predicate.size()];
 				return query.where(predicate.toArray(pre)).getRestriction();
 			}
@@ -214,6 +232,8 @@ public class StockDetailService implements IStockDetailService {
 			}
 		};
 	}
+	
+	
 	/*@Override
 	public Page<Stock> findAll(Specification<Stock> spec, Pageable pageable){
 		return stockRepository.findAll(spec, pageable);

@@ -91,20 +91,6 @@ public class ProductController
 		return 	page;
     }
 	
-	@RequestMapping(value = "/getProduct")
-	public List<Product> getProduct() 
-	{
-		List<Product> resList = productService.findAll();	
-		List list = new ArrayList();
-		for(int i=0;i<resList.size();i++) {
-			Map<String,Object> map1=new HashMap<String, Object>();
-			map1.put("value",resList.get(i).getId() );
-			map1.put("name", resList.get(i).getProductName());
-			list.add(map1);
-		}
-		return list;
-	}
-	
 	@RequestMapping(value = "/moresearch")
     public Page<Product>  moresearch(@RequestParam(value = "toSubmit") String toSubmit[],ExtjsPageRequest pageable) {
 		Product product=new Product();

@@ -100,6 +100,22 @@ public class RepoController {
 		return list;
 	}
 	
+	@GetMapping("/setRepo")
+	public List<RepoQueryDTO> setRepo() 
+	{
+		List<RepoQueryDTO> resList = repoService.findAll(repoService.setRepo());	
+		List list = new ArrayList();
+		for(int i=0;i<resList.size();i++) {
+			Repo repo=new Repo();
+			BeanUtils.copyProperties(resList.get(i), repo);
+			Map<String,Object> map1=new HashMap<String, Object>();
+			map1.put("value", repo.getId());
+			map1.put("name", repo.getRepoName());
+			list.add(map1);
+		}
+		return list;
+	}
+	
 	@PutMapping(value="{id}",consumes=MediaType.APPLICATION_JSON_VALUE)
 	public ExtAjaxResponse update(@PathVariable("id") Long myId,@RequestBody RepoQueryDTO dto) {//修改
 		try {

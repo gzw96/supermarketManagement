@@ -128,4 +128,18 @@ public class RepoService implements RepoServiceImpl{
 			}
 		};
 	}
+	
+	@Override
+	public Specification<RepoQueryDTO> setRepo() {
+		return new Specification<RepoQueryDTO>() {
+			@Override
+			public Predicate toPredicate(Root<RepoQueryDTO> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) {
+				List<Predicate> predicate = new ArrayList<>();
+				predicate.add(criteriaBuilder.isNotNull(root.get("stock")));
+				predicate.add(criteriaBuilder.equal(root.get("type"),"仓库"));
+				Predicate[] pre = new Predicate[predicate.size()];
+				return query.where(predicate.toArray(pre)).getRestriction();
+			}
+		};
+	}
 }

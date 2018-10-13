@@ -24,7 +24,9 @@ public interface RepoServiceImpl {
 	
 	public void deleteAll(Long[] ids);
 	public Specification<RepoQueryDTO> getRepo() ;
+	public Specification<RepoQueryDTO> setRepo() ;
 	public Specification<RepoQueryDTO> getNeedinit() ;
+	
 	//hql查询
 	public Long getRepoUserId(String userName,Long workNum);
 	public void  findUserById(Long userid,String repoName);

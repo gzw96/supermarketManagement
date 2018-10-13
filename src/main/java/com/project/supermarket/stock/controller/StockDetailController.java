@@ -2,11 +2,11 @@ package com.project.supermarket.stock.controller;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
-
-
-
-
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -23,6 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.project.supermarket.common.web.ExtAjaxResponse;
 import com.project.supermarket.common.web.ExtjsPageRequest;
+import com.project.supermarket.management.product.entity.Product;
 import com.project.supermarket.stock.entity.Stock;
 import com.project.supermarket.stock.service.StockDetailService;
 import com.project.supermarket.stock.service.StockService;
@@ -45,6 +46,15 @@ public class StockDetailController
 		stockDetailService.save(toSubmit);
     	
     }
+	
+	@RequestMapping(value = "/getProduct")
+	public List<String> getProduct(@RequestParam(value = "repoid") String repoid) 
+	{
+		//System.out.println(repoid);
+		List<String> resList = stockDetailService.findAll(repoid);	
+		
+		return resList;
+	}
 	
 	/*@RequestMapping(value = "/upload")
     public @ResponseBody ExtAjaxResponse deploy(@RequestParam(value = "stockPrice") Double stockPrice,@RequestParam(value = "status") String status,@RequestParam(value = "getBrandName") String getBrandName,@RequestParam(value = "id") Long id,@RequestParam(value = "stockName") String stockName,@RequestParam(value = "stockImg") MultipartFile file) {
