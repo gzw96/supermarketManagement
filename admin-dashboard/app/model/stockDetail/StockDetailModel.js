@@ -16,6 +16,6 @@ Ext.define('Admin.model.stockDetail.StockDetailModel', {
 	],
 	proxy: {
 		type: 'rest',
-		url: '/stock',
+		url: '/stockDetail',
 	}
 });

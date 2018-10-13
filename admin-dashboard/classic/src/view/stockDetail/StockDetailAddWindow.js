@@ -14,6 +14,7 @@ Ext.define('Admin.view.stockDetail.StockDetailAddWindow', {
     modal:true,
     layout: 'fit',
     items: [{
+        id:'form',
         xtype: 'form',
         layout: 'form',
         padding: '10px',
@@ -25,58 +26,54 @@ Ext.define('Admin.view.stockDetail.StockDetailAddWindow', {
             hidden: true,
             readOnly: true
         },{
-            xtype: 'datefield',
-            fieldLabel: '创建时间',
-            format: 'Y-m-d H:i:s', 
-            name: 'createTime',
-            editable:false,
-            value:new Date(),
-             readOnly: true
-        },{
-            xtype: 'datefield',
-            fieldLabel: '最后更新时间',
-            format: 'Y-m-d H:i:s', 
-            name: 'updateTime',
-            editable:false,
-            value:new Date(),
-            readOnly: true,
-            hidden:true
-        },{
-            xtype: 'textfield',
-            name: 'stockDetailName',
-            fieldLabel: '商品名称',
-            allowBlank: false
-        },{
-            xtype: 'textfield',
-            name: 'stockDetailPrice',
-            fieldLabel: '商品单价',
-            allowBlank: false
-        },{
-            xtype: 'radiogroup',
-            fieldLabel: '商品状态',
-            items: [{
-                name: 'status',
-                boxLabel:'在售',
-                inputValue: '1',
-                checked:true
-            },{
-                name: 'status',
-                boxLabel:'下架',
-                inputValue: '0',
-            }]
-        },{
+            id:'getRepo',
             xtype: 'combobox',
-            name: 'getBrandName',
-            fieldLabel: '商品品牌',
+            name: 'getRepo',
+            fieldLabel: '调出仓库',
             store: new Ext.data.Store( {
                     proxy : new Ext.data.HttpProxy( {
-                        url : 'brand/getBrand'//提交到某action的某方法
+                        url : 'repo/setRepo'//提交到某action的某方法
+                    }),
+                    reader : new Ext.data.JsonReader( {rootProperty:""}, []),//需要显示的数据实体字段
+                    autoLoad : true
+                }),
+            displayField : 'name',
+            hiddenName : 'getRepo',
+            valueField : 'value', 
+            triggerAction : 'all',
+            editable : false,
+            allowBlank : false,
+            listeners:{
+                select:function(combo,btn){
+                    var count=0;
+                    var form = Ext.getCmp('form');
+                    while(true){
+                        if(Ext.getCmp('com'+count)!=null){
+                            form.remove(Ext.getCmp('com'+count));
+                            form.remove(Ext.getCmp('text'+count));
+                            count++;
+                        }else if(Ext.getCmp('com'+count)==null){
+                            break;
+                        }
+                    }
+                }
+            }
+              
+            
+        },{
+            id:'setRepo',
+            xtype: 'combobox',
+            name: 'setRepo',
+            fieldLabel: '调入仓库/门店',
+            store: new Ext.data.Store( {
+                    proxy : new Ext.data.HttpProxy( {
+                        url : 'repo/getRepo'//提交到某action的某方法
                     }),
                     reader : new Ext.data.JsonReader( {rootProperty:""}, []),//需要显示的数据实体字段
                     autoLoad : true
                 }),
                 displayField : 'name',
-                hiddenName : 'getBrandName',
+                hiddenName : 'setRepo',
                 valueField : 'value', 
                 triggerAction : 'all',
                 editable : false,
@@ -87,11 +84,47 @@ Ext.define('Admin.view.stockDetail.StockDetailAddWindow', {
         xtype: 'button',
         text: '提交',
         handler: 'submitAddForm'
-    },{
+    },'->',{
         xtype: 'button',
-        text: '关闭',
+        text: '添加商品栏',
         handler: function(btn) {
-            btn.up('window').close();
+            var url=Ext.getCmp('getRepo').getValue();
+            //alert(url);
+            var count=0;
+            while(true){
+                if(Ext.getCmp('com'+count)!=null){
+                    count++;
+                }else if(Ext.getCmp('com'+count)==null){
+                    break;
+                }
+            }
+            var com =new Ext.form.ComboBox ({
+                id:'com'+count,
+                name: 'getProductName',
+                fieldLabel: '商品名',
+                store: new Ext.data.Store( {
+                        proxy : new Ext.data.HttpProxy( {
+                            url : 'stockDetail/getProduct?repoid='+url//提交到某action的某方法
+                        }),
+                        reader : new Ext.data.JsonReader( {rootProperty:""}, []),//需要显示的数据实体字段
+                        autoLoad : true
+                    }),
+                    displayField : 'name',
+                    hiddenName : 'getBrandName',
+                    valueField : 'value', 
+                    triggerAction : 'all',
+                    editable : false,
+                    allowBlank : false
+            });
+           
+            var textfield= new Ext.form.TextField({
+                id:'text'+count,
+                fieldLabel: '数量'
+            });
+            var win = btn.up('window');
+            var form = win.down('form');
+            form.add(com);
+            form.add(textfield);
         }
-    },'->']
+    }]
 });
