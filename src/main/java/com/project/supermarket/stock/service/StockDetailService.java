@@ -63,8 +63,12 @@ public class StockDetailService implements IStockDetailService {
 		String []proId=toSubmit[1].split(",");
 		String []proNum=toSubmit[0].split(",");	
 		int count=0;
-		Stock stock=stockRepository.findOne(findstock(toSubmit[2])).get();
-		List<StockDetail> list=stockDetailRepository.findAll(findstockDetail(stock.getId()));
+		Stock stock=stockRepository.findOne(findstock(toSubmit[3])).get();		//存入的仓库
+		Stock stock1=stockRepository.findOne(findstock(toSubmit[2])).get(); 	  //取出的仓库
+		List<StockDetail> list=stockDetailRepository.findAll(findstockDetail(stock.getId()));	//获取存入仓库的全部库存详情表
+		List<StockDetail> list1=stockDetailRepository.findAll(findstockDetail(stock1.getId()));	//获取取出仓库的库存详情表
+		
+		/*存入仓库库存详情表的操作*/
 		if(list.isEmpty()==true) {
 			for(int i=0;i<proId.length;i++) {
 				
@@ -80,12 +84,9 @@ public class StockDetailService implements IStockDetailService {
 			stockRepository.save(stock);
 		}else if(!list.isEmpty()) {
 			for(int j=0;j<proId.length;j++) {
-				int flag=0;
 				for(int i=0;i<list.size();i++)  {
 					if(Long.parseLong(proId[j])!=list.get(i).getProduct().getId()) {
-						flag++;
-						if(flag==list.size()) {
-							
+						if((i+1)==list.size()) {
 							StockDetail stockDetail=new StockDetail();
 							stockDetail.setStock(stock);
 							stockDetail.setNum(Integer.parseInt(proNum[j]));
@@ -96,7 +97,7 @@ public class StockDetailService implements IStockDetailService {
 							stock.setStockNum(count);
 							stockRepository.save(stock);
 						}
-					}else {
+					}else if(Long.parseLong(proId[j])==list.get(i).getProduct().getId()){
 						int countpro=list.get(i).getNum()+Integer.parseInt(proNum[j]);
 						StockDetail stockDetail=list.get(i);
 						stockDetail.setNum(countpro);
@@ -108,12 +109,28 @@ public class StockDetailService implements IStockDetailService {
 				}
 			}
 		}
+		/*取出仓库库存详情表的操作*/
+		for(int i=0;i<list1.size();i++) {
+			for(int j=0;j<proId.length;j++) {
+				if(list1.get(i).getProduct().getId()==Long.parseLong(proId[j])) {
+					list1.get(i).setNum(list1.get(i).getNum()-Integer.parseInt(proNum[j]));
+					stockDetailRepository.save(list1.get(i));
+				}
+			}
+		}
+		int all=0;
+		for(int i=0;i<proNum.length;i++) {
+			all=all+Integer.parseInt(proNum[i]);
+		}
+		stock1.setStockNum(stock1.getStockNum()-all);
+		stockRepository.save(stock1);
 		
 	}
 	
 	
+	
 	@Override
-	public List<String> findAll(String repoid){
+	public List<Object> findAll(String repoid){
 		Stock stock=stockRepository.findOne(findstock(repoid)).get();
 		List<StockDetail> list=stockDetailRepository.findAll(findstockDetail(stock.getId()));
 		List finalList = new ArrayList();
@@ -121,7 +138,7 @@ public class StockDetailService implements IStockDetailService {
 			for(int i=0;i<list.size();i++) {
 				Map<String,Object> map1=new HashMap<String, Object>();
 				map1.put("value",list.get(i).getProduct().getId() );
-				map1.put("name", list.get(i).getProduct().getProductName());
+				map1.put("name", list.get(i).getProduct().getProductName()+"(剩余库存："+list.get(i).getNum()+")");
 				finalList.add(map1);
 				
 			}	

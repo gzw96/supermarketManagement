@@ -17,7 +17,7 @@ import com.project.supermarket.management.product.entity.Product;
 public interface IStockDetailService 
 {
 	public void save(String []toSubmit);
-	public List<String> findAll(String repoid);
+	public List<Object> findAll(String repoid);
 	
 	/*public void delete(Long id);
 	public void deleteAll(Long[] ids);

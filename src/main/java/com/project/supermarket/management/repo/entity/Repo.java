@@ -13,10 +13,12 @@ import javax.persistence.ManyToOne;
 import javax.persistence.OneToOne;
 import javax.persistence.Table;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.project.supermarket.stock.entity.Stock;
 import com.project.supermarket.user.entity.User;
 
 @Entity
+@JsonIgnoreProperties(value={"stock"})
 @Table(name="repository")
 public class Repo {
 	private Long id;

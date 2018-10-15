@@ -48,10 +48,10 @@ public class StockDetailController
     }
 	
 	@RequestMapping(value = "/getProduct")
-	public List<String> getProduct(@RequestParam(value = "repoid") String repoid) 
+	public List<Object> getProduct(@RequestParam(value = "repoid") String repoid) 
 	{
 		//System.out.println(repoid);
-		List<String> resList = stockDetailService.findAll(repoid);	
+		List<Object> resList = stockDetailService.findAll(repoid);	
 		
 		return resList;
 	}

@@ -19,10 +19,12 @@ import javax.persistence.Transient;
 
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.project.supermarket.management.brand.entity.Brand;
 import com.project.supermarket.stock.entity.StockDetail;
 
 @Entity
+@JsonIgnoreProperties(value={"stockDetail"})
 public class Product{
 	
 	@Id
