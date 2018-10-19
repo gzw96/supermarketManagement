@@ -6,9 +6,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
@@ -30,8 +32,10 @@ import com.project.supermarket.management.brand.entity.Brand;
 import com.project.supermarket.management.repo.entity.Repo;
 import com.project.supermarket.management.repo.repository.RepoRepository;
 import com.project.supermarket.management.repo.service.RepoService;
+import com.project.supermarket.stock.dao.StockDetailRepository;
 import com.project.supermarket.stock.dao.StockRepository;
 import com.project.supermarket.stock.entity.Stock;
+import com.project.supermarket.stock.entity.StockDetail;
 
 
 
@@ -41,6 +45,9 @@ public class StockService implements IStockService {
 
 	@Autowired
 	private StockRepository stockRepository;
+	
+	@Autowired
+	private StockDetailRepository stockDetailRepository;
 	
 	@Autowired
 	private RepoRepository repoRepository;
@@ -60,7 +67,42 @@ public class StockService implements IStockService {
 			repoRepository.save(repo);
 		}
 	}
-
+	
+	@Override
+	public List<Object> getAllRepoCloumn(){
+		List<Stock> list=(List<Stock>) stockRepository.findAll();
+		List finalList = new ArrayList();
+		if(!list.isEmpty()) {
+			for(int i=0;i<list.size();i++) {
+				Map<String,Object> map=new HashMap<String,Object>();
+				map.put("name", list.get(i).getRepository().getRepoName());
+				map.put("value1",list.get(i).getStockNum());
+				map.put("value2",list.get(i).getRepository().getMaxSize());
+				finalList.add(map);			
+			}	
+		}
+		return finalList;
+	}
+	
+	
+	@Override
+	public List<Object> getRepoPie(Long repoid){
+		Stock stock=stockRepository.findOne(stock(repoid)).get();
+		List<StockDetail> stockDetail=stockDetailRepository.findAll(stockDetail(stock.getId()));
+		List finalList = new ArrayList();
+		for(int i=0;i<stockDetail.size();i++) {
+			Map<String,Object> map=new HashMap<String,Object>();
+			map.put("name", stockDetail.get(i).getProduct().getId());
+			map.put("value",stockDetail.get(i).getNum());
+			finalList.add(map);			
+		}
+		Map<String,Object> map=new HashMap<String,Object>();
+		map.put("name", "未使用");
+		map.put("value",stock.getRepository().getMaxSize()-stock.getStockNum());
+		finalList.add(map);
+		return finalList;
+	}
+	
 	/*@Override
 	public void delete(Long id) {
 		Stock stock = stockRepository.findById(id).get();
@@ -138,25 +180,32 @@ public class StockService implements IStockService {
 				return query.where(predicate.toArray(pre)).getRestriction();
 			}
 		};
-	}
+	}*/
 	
-	public Specification<Stock> moresearch(final Stock stock,String toSubmit[]) {
+	public Specification<Stock> stock(Long id) {
 		return new Specification<Stock>() {
 			@Override
 			public Predicate toPredicate(Root<Stock> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) {
 				List<Predicate> predicate = new ArrayList<>();
-				if(toSubmit[0].equals("getBrandName")) {
-					predicate.add(criteriaBuilder.equal(root.join("brand").get("id").as(String.class),toSubmit[1]));
-				}else {
-					predicate.add(criteriaBuilder.equal(root.get(toSubmit[0]).as(String.class),toSubmit[1]));
-				}
+				predicate.add(criteriaBuilder.equal(root.join("repository").get("id"),id));
 				Predicate[] pre = new Predicate[predicate.size()];
 				return query.where(predicate.toArray(pre)).getRestriction();
 			}
 		};
 	}
 	
-	@Override
+	public Specification<StockDetail> stockDetail(Long id) {
+		return new Specification<StockDetail>() {
+			@Override
+			public Predicate toPredicate(Root<StockDetail> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) {
+				List<Predicate> predicate = new ArrayList<>();
+				predicate.add(criteriaBuilder.equal(root.join("stock").get("id"),id));
+				Predicate[] pre = new Predicate[predicate.size()];
+				return query.where(predicate.toArray(pre)).getRestriction();
+			}
+		};
+	}
+	/*@Override
 	public Page<Stock> findAll(Specification<Stock> spec, Pageable pageable){
 		return stockRepository.findAll(spec, pageable);
 	}

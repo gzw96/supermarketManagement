@@ -98,19 +98,25 @@
                     {
                         text:'查看库存状况',
                         iconCls: 'x-fa fa-link',
-                       // viewType: 'order',
-                        leaf:true
-                    },
-                    {
-                        text:'库存流水',
-                        iconCls: 'x-fa fa-link',
-                       // viewType: 'order',
+                        viewType: 'stockPiePanel',
                         leaf:true
                     },
                     {
                         text:'库存调拨',
                         iconCls: 'x-fa fa-link',
-                        //viewType: 'order',
+                        viewType: 'stockDetailPanel',
+                        leaf:true
+                    },
+                    {
+                        text:'仓库初始化',
+                        iconCls: 'x-fa fa-link',
+                        viewType: 'stockPanel',
+                        leaf:true
+                    },
+                    {
+                        text:'库存流水',
+                        iconCls: 'x-fa fa-link',
+                        viewType: 'tranPanel',
                         leaf:true
                     }
                 ]

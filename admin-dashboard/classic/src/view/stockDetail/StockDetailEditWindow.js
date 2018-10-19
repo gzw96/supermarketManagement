@@ -1,113 +1,41 @@
 Ext.define('Admin.view.stockDetail.StockDetailEditWindow', {
     extend: 'Ext.window.Window',
     alias: 'widget.stockDetailEditWindow',
-    height: 480,
-    minHeight: 480,
-    minWidth: 500,
-    width: 500,
-    scrollable: false,
-    title: 'Edit stockDetail Window',
-    closable: true,
-    constrain: true,
-    defaultFocus: 'textfield',
-    modal:true,
-	items: [{
-        layout:'absolute',
-        x: 150,
-        items:[{
-            xtype: 'image',
-            id: 'imageId',
-            width: 143,
-            height: 162
-            
-        }]
+
+    
+    title: '进货详单',
+    frame: true,
+    width: 650,
+    height: 430,
+    bodyPadding: 10,
+    scrollable: true,
+    items: [{
+        // Use the default, automatic layout to distribute the controls evenly
+        // across a single row
+        scrollable: true,
+        xtype: 'checkboxgroup',
+        fieldLabel: '商品集合',
+        id:'productlist',
+        cls: 'x-check-group-alt',
+        columns: 3,
+        items: []
     },{
-        xtype: 'form',
-        layout: 'form',
-       
-        ariaLabel: 'Enter your name',
-        items: [{
-            xtype: 'textfield',       
-            fieldLabel: 'id',
-            name:'id',
-            hidden: true,
-            readOnly: true
-        },{
-            xtype: 'filefield',
-            id: 'upload',
-            fieldLabel: '品牌商标',
-            name:'stockDetailImg',
-            allowBlank: false,
-            listeners : {
-                'render' : function() {
-                    Ext.getCmp('upload').on('change',function(field, newValue, oldValue) {
-                        var file = field.fileInputEl.dom.files.item(0);
-                        var fileReader = new FileReader('file://'+newValue);
-                        fileReader.readAsDataURL(file);
-                        fileReader.onload=function(e){
-                           var a= Ext.getCmp('imageId').setSrc(e.target.result);
-                        }
-                    });
-                }
-            }
-        },{
-            xtype: 'textfield',       
-            fieldLabel: 'id',
-            name:'id',
-            hidden: true,
-            readOnly: true
-        },{
-            xtype: 'textfield',
-            fieldLabel: '品牌名',
-            name:'stockDetailName',
-            allowBlank: false
-        },{
-            xtype: 'textfield',
-            name: 'stockDetailPrice',
-            fieldLabel: '商品单价',
-            allowBlank: false
-        },{
-            xtype: 'radiogroup',
-            fieldLabel: '商品状态',
-            items: [{
-                name: 'status',
-                boxLabel:'在售',
-                inputValue: '1',
-                checked:true
-            },{
-                name: 'status',
-                boxLabel:'下架',
-                inputValue: '0',
-            }]
-        },{
-            xtype: 'combobox',
-            name: 'getBrandName',
-            id:'getBrandName',
-            fieldLabel: '商品品牌',
-            store: new Ext.data.Store( {
-                    proxy : new Ext.data.HttpProxy( {
-                        url : 'brand/getBrand'
-                    }),
-                    reader : new Ext.data.JsonReader( {rootProperty:""}, []),
-                    autoLoad : true
-                }),
-                displayField : 'name',
-                hiddenName : 'getBrandName',
-                valueField : 'value', 
-                triggerAction : 'all',
-                editable : false,
-                allowBlank : false
-        }]
-    }],buttons: ['->',{
-        xtype: 'button',
+        id:'parm',
+        xtype: 'textfield',       
+        fieldLabel: 'id',
+        name:'repoId',
+        hidden: true,
+        readOnly: true
+    }],
+
+    buttons: [{
         text: '提交',
         handler: 'submitEditForm'
     },{
-        xtype: 'button',
-        text: 'Close',
-        handler: function(btn) {
-            btn.up('window').close();
-        }
-    },'->']
-  
+        text: '重置',
+        handler: 'onResetFormClick'
+    },{
+        text: '全选',
+        handler: 'onAllFormClick'
+    }]
 });

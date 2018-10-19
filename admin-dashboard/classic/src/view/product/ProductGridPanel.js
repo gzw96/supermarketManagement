@@ -12,6 +12,7 @@ Ext.define('Admin.view.product.ProductGridPanel', {
 	    'Ext.toolbar.*',
 	    'Ext.slider.Multi'
 	],
+	
 	layout: 'fit',
 	items: [{
 		xtype: 'gridpanel',

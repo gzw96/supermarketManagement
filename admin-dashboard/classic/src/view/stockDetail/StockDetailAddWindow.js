@@ -1,19 +1,18 @@
 Ext.define('Admin.view.stockDetail.StockDetailAddWindow', {
     extend: 'Ext.window.Window',
     alias: 'widget.stockDetailAddWindow',
-    height: 350,
+    height: 600,
     minHeight: 350,
     minWidth: 300,
     width: 500,
-    scrollable: true,
-    title: '仓库完善',
+    title: '库存调拨',
     closable: true,
     constrain: true,
-    
     defaultFocus: 'textfield',
     modal:true,
     layout: 'fit',
     items: [{
+        scrollable: true,
         id:'form',
         xtype: 'form',
         layout: 'form',
@@ -44,7 +43,7 @@ Ext.define('Admin.view.stockDetail.StockDetailAddWindow', {
             editable : false,
             allowBlank : false,
             listeners:{
-                select:function(combo,btn){
+                select:function(combo){
                     var count=0;
                     var form = Ext.getCmp('form');
                     while(true){

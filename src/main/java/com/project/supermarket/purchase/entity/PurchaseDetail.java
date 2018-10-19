@@ -19,7 +19,7 @@ public class PurchaseDetail {
 	private Purchase purchase;
 	private Product product;
 	private Long purchaseNum;
-	private PurchaseStatus puchaseStatus;
+	private String puchaseStatus;
 	
 	@Id
 	@GeneratedValue(strategy=GenerationType.IDENTITY)
@@ -39,13 +39,13 @@ public class PurchaseDetail {
 		return purchase;
 	}
 
-	@Column(nullable=false)
+
 	public Long getPurchaseNum() {
 		return purchaseNum;
 	}
 	
-	@Column(nullable=false)
-	public PurchaseStatus getPuchaseStatus() {
+
+	public String getPuchaseStatus() {
 		return puchaseStatus;
 	}
 	
@@ -62,7 +62,7 @@ public class PurchaseDetail {
 	public void setPurchaseNum(Long purchaseNum) {
 		this.purchaseNum = purchaseNum;
 	}
-	public void setPuchaseStatus(PurchaseStatus puchaseStatus) {
+	public void setPuchaseStatus(String puchaseStatus) {
 		this.puchaseStatus = puchaseStatus;
 	}
 	

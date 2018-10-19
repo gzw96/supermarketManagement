@@ -102,7 +102,6 @@ public class RepoQueryDTO {
         List<Long> list = query.list();
         uId=list.get(0);*/
 		uId = repoService.getRepoUserId(uName, num);
-        System.out.println(uId);
         dto.setRoleId(uId);
         /*s.getTransaction().commit();
         s.close();

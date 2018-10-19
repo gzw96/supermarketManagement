@@ -1,11 +1,11 @@
-Ext.define('Admin.store.stockDetail.StockDetailStroe', {
+Ext.define('Admin.store.stockDetail.StockDetailStore', {
 	extend: 'Ext.data.Store',
-	storeId:'sockDetailStroe',
-	alias: 'store.stockDetailStroe',
+	storeId:'stockDetailStore',
+	alias: 'store.stockDetailStore',
 	model:'Admin.model.stockDetail.StockDetailModel',
 	proxy: {
 		type: 'rest',
-		url: '/stock',
+		url: '/stockDetail/getPurchase',
 		reader:{
 			type:'json',
 			rootProperty:'content',//对应后台返回的结果集名称

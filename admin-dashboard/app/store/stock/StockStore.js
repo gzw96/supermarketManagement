@@ -5,7 +5,7 @@ Ext.define('Admin.store.stock.StockStroe', {
 	model:'Admin.model.stock.StockModel',
 	proxy: {
 		type: 'rest',
-		url: '/stock',
+		url: '/repo/getUninit',
 		reader:{
 			type:'json',
 			rootProperty:'content',//对应后台返回的结果集名称

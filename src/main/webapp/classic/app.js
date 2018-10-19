@@ -53208,6 +53208,16 @@ Ext.define('Ext.mixin.Responsive', function(Responsive) {
     this.setConfig(config);
   }}};
 });
+Ext.define('Ext.mixin.StyleCacher', {extend:Ext.Mixin, mixinConfig:{id:'stylecacher'}, getCachedStyle:function(el, style) {
+  var cache = this.$styleCache;
+  if (!cache) {
+    cache = this.$styleCache = {};
+  }
+  if (!(style in cache)) {
+    cache[style] = Ext.fly(el).getStyle(style);
+  }
+  return cache[style];
+}});
 Ext.define('Ext.perf.Accumulator', function() {
   var currentFrame = null, khrome = Ext.global['chrome'], formatTpl, getTimestamp = function() {
     getTimestamp = Ext.now;
@@ -81762,6 +81772,78 @@ Ext.define('Ext.grid.column.Date', {extend:Ext.grid.column.Column, alias:['widge
 }, updater:function(cell, value) {
   Ext.fly(cell).down(this.getView().innerSelector, true).innerHTML = Ext.grid.column.Date.prototype.defaultRenderer.call(this, value);
 }});
+Ext.define('Ext.grid.feature.Feature', {extend:Ext.util.Observable, alias:'feature.feature', wrapsItem:false, isFeature:true, disabled:false, hasFeatureEvent:true, eventPrefix:null, eventSelector:null, view:null, grid:null, columnSizer:null, constructor:function(config) {
+  this.initialConfig = config;
+  this.callParent(arguments);
+}, clone:function() {
+  return new this.self(this.initialConfig);
+}, init:Ext.emptyFn, getFireEventArgs:function(eventName, view, featureTarget, e) {
+  return [eventName, view, featureTarget, e];
+}, vetoEvent:Ext.emptyFn, enable:function() {
+  this.disabled = false;
+}, disable:function() {
+  this.disabled = true;
+}});
+Ext.define('Ext.grid.feature.RowBody', {extend:Ext.grid.feature.Feature, alias:'feature.rowbody', rowBodyCls:Ext.baseCSSPrefix + 'grid-row-body', innerSelector:'.' + Ext.baseCSSPrefix + 'grid-rowbody', rowBodyHiddenCls:Ext.baseCSSPrefix + 'grid-row-body-hidden', rowBodyTdSelector:'td.' + Ext.baseCSSPrefix + 'grid-cell-rowbody', eventPrefix:'rowbody', eventSelector:'tr.' + Ext.baseCSSPrefix + 'grid-rowbody-tr', bodyBefore:false, outerTpl:{fn:function(out, values, parent) {
+  var me = this.rowBody, view = values.view, columns = view.getVisibleColumnManager().getColumns(), rowValues = view.rowValues, rowExpanderCol = me.rowExpander && me.rowExpander.expanderColumn;
+  rowValues.rowBodyColspan = columns.length;
+  rowValues.rowBodyCls = me.rowBodyCls;
+  rowValues.rowIdCls = me.rowIdCls;
+  if (rowExpanderCol && rowExpanderCol.getView() === view) {
+    view.grid.removeCls(Ext.baseCSSPrefix + 'grid-hide-row-expander-spacer');
+    rowValues.addSpacerCell = true;
+    rowValues.rowBodyColspan -= 1;
+    rowValues.spacerCellCls = Ext.baseCSSPrefix + 'grid-cell ' + Ext.baseCSSPrefix + 'grid-row-expander-spacer ' + Ext.baseCSSPrefix + 'grid-cell-special';
+  } else {
+    view.grid.addCls(Ext.baseCSSPrefix + 'grid-hide-row-expander-spacer');
+    rowValues.addSpacerCell = false;
+  }
+  this.nextTpl.applyOut(values, out, parent);
+  rowValues.rowBodyCls = rowValues.rowBodyColspan = rowValues.rowBody = null;
+}, priority:100}, extraRowTpl:['{%', 'if(this.rowBody.bodyBefore) {', 'values.view.renderColumnSizer(values, out);', '} else {', 'this.nextTpl.applyOut(values, out, parent);', '}', 'values.view.rowBodyFeature.setupRowData(values.record, values.recordIndex, values);', '%}', '\x3ctr class\x3d"' + Ext.baseCSSPrefix + 'grid-rowbody-tr {rowBodyCls} {rowIdCls}" {ariaRowAttr}\x3e', '\x3ctpl if\x3d"addSpacerCell"\x3e', '\x3ctd class\x3d"{spacerCellCls}"\x3e\x3c/td\x3e', '\x3c/tpl\x3e', '\x3ctd class\x3d"' + 
+Ext.baseCSSPrefix + 'grid-td ' + Ext.baseCSSPrefix + 'grid-cell-rowbody" colspan\x3d"{rowBodyColspan}" {ariaCellAttr}\x3e', '\x3cdiv class\x3d"' + Ext.baseCSSPrefix + 'grid-rowbody {rowBodyDivCls}" {ariaCellInnerAttr}\x3e{rowBody}\x3c/div\x3e', '\x3c/td\x3e', '\x3c/tr\x3e', '{%', 'if(this.rowBody.bodyBefore) {', 'this.nextTpl.applyOut(values, out, parent);', '}', '%}', {priority:100, beginRowSync:function(rowSync) {
+  rowSync.add('rowBody', this.owner.eventSelector);
+}, syncContent:function(destRow, sourceRow, columnsToUpdate) {
+  var rowBody = this.rowBody, destRowBody, sourceRowBody;
+  if (rowBody.doSync) {
+    destRowBody = Ext.fly(destRow).down(rowBody.eventSelector, true);
+    if (destRowBody && (sourceRowBody = Ext.fly(sourceRow).down(rowBody.eventSelector, true))) {
+      Ext.fly(destRowBody).syncContent(sourceRowBody);
+    }
+  }
+}}], doSync:true, init:function(grid) {
+  var me = this, view = me.view = grid.getView();
+  if (!me.rowExpander && grid.findPlugin('rowexpander')) {
+    Ext.raise("The RowBody feature shouldn't be manually added when the grid has a RowExpander.");
+  }
+  grid.variableRowHeight = view.variableRowHeight = true;
+  view.rowBodyFeature = me;
+  view.headerCt.on({columnschanged:me.onColumnsChanged, scope:me});
+  view.addTpl(me.outerTpl).rowBody = me;
+  view.addRowTpl(Ext.XTemplate.getTpl(this, 'extraRowTpl')).rowBody = me;
+  me.callParent(arguments);
+}, getSelectedRow:function(view, rowIndex) {
+  var selectedRow = view.getNode(rowIndex);
+  if (selectedRow) {
+    return Ext.fly(selectedRow).down(this.eventSelector);
+  }
+  return null;
+}, onColumnsChanged:function(headerCt) {
+  var view = this.view, items, colspan, len, i;
+  if (!view.rendered) {
+    return;
+  }
+  items = view.el.query(this.rowBodyTdSelector);
+  colspan = headerCt.getVisibleGridColumns().length;
+  len = items.length;
+  for (i = 0; i < len; ++i) {
+    items[i].setAttribute('colSpan', colspan);
+  }
+}, setupRowData:function(record, rowIndex, rowValues) {
+  if (this.getAdditionalData) {
+    Ext.apply(rowValues, this.getAdditionalData(record.data, rowIndex, record, rowValues));
+  }
+}});
 Ext.define('Ext.menu.Item', {extend:Ext.Component, alias:'widget.menuitem', alternateClassName:'Ext.menu.TextItem', isMenuItem:true, mixins:[Ext.mixin.Queryable], config:{glyph:null}, activated:false, activeCls:Ext.baseCSSPrefix + 'menu-item-active', clickHideDelay:0, destroyMenu:true, disabledCls:Ext.baseCSSPrefix + 'menu-item-disabled', hideOnClick:true, menuAlign:'tl-tr?', menuExpandDelay:200, menuHideDelay:200, tooltipType:'qtip', focusable:true, ariaRole:'menuitem', ariaEl:'itemEl', baseCls:Ext.baseCSSPrefix + 
 'menu-item', arrowCls:Ext.baseCSSPrefix + 'menu-item-arrow', baseIconCls:Ext.baseCSSPrefix + 'menu-item-icon', textCls:Ext.baseCSSPrefix + 'menu-item-text', indentCls:Ext.baseCSSPrefix + 'menu-item-indent', indentNoSeparatorCls:Ext.baseCSSPrefix + 'menu-item-indent-no-separator', indentRightIconCls:Ext.baseCSSPrefix + 'menu-item-indent-right-icon', indentRightArrowCls:Ext.baseCSSPrefix + 'menu-item-indent-right-arrow', linkCls:Ext.baseCSSPrefix + 'menu-item-link', linkHrefCls:Ext.baseCSSPrefix + 
 'menu-item-link-href', childEls:['itemEl', 'iconEl', 'textEl', 'arrowEl'], renderTpl:'\x3ctpl if\x3d"plain"\x3e' + '{text}' + '\x3ctpl else\x3e' + '\x3ca id\x3d"{id}-itemEl" data-ref\x3d"itemEl"' + ' class\x3d"{linkCls}\x3ctpl if\x3d"hasHref"\x3e {linkHrefCls}\x3c/tpl\x3e{childElCls}"' + ' href\x3d"{href}" ' + '\x3ctpl if\x3d"hrefTarget"\x3e target\x3d"{hrefTarget}"\x3c/tpl\x3e' + ' hidefocus\x3d"true"' + ' unselectable\x3d"on"' + '\x3ctpl if\x3d"tabIndex !\x3d null"\x3e' + ' tabindex\x3d"{tabIndex}"' + 
@@ -84586,6 +84668,389 @@ Ext.define('Ext.grid.plugin.BufferedRenderer', {extend:Ext.plugin.Abstract, alia
   Ext.destroy(me.viewListeners, me.stretcher, me.gridListeners, me.scrollListeners);
   me.callParent();
 }});
+Ext.define('Ext.grid.plugin.RowExpander', {extend:Ext.plugin.Abstract, lockableScope:'top', alias:'plugin.rowexpander', columnWidth:24, rowBodyTpl:null, lockedTpl:null, expandOnDblClick:true, selectRowOnExpand:false, scrollIntoViewOnExpand:true, headerWidth:24, bodyBefore:false, rowBodyTrSelector:'.' + Ext.baseCSSPrefix + 'grid-rowbody-tr', rowBodyHiddenCls:Ext.baseCSSPrefix + 'grid-row-body-hidden', rowCollapsedCls:Ext.baseCSSPrefix + 'grid-row-collapsed', addCollapsedCls:{fn:function(out, values, 
+parent) {
+  var me = this.rowExpander;
+  if (!me.recordsExpanded[values.record.internalId]) {
+    values.itemClasses.push(me.rowCollapsedCls);
+  }
+  this.nextTpl.applyOut(values, out, parent);
+}, syncRowHeights:function(lockedItem, normalItem) {
+  this.rowExpander.syncRowHeights(lockedItem, normalItem);
+}, priority:20000}, setCmp:function(grid) {
+  var me = this, features;
+  me.callParent([grid]);
+  me.recordsExpanded = {};
+  if (!me.rowBodyTpl) {
+    Ext.raise("The 'rowBodyTpl' config is required and is not defined.");
+  }
+  me.rowBodyTpl = Ext.XTemplate.getTpl(me, 'rowBodyTpl');
+  features = me.getFeatureConfig(grid);
+  if (grid.features) {
+    grid.features = Ext.Array.push(features, grid.features);
+  } else {
+    grid.features = features;
+  }
+}, getFeatureConfig:function(grid) {
+  var me = this, features = [], featuresCfg = {ftype:'rowbody', rowExpander:me, rowIdCls:me.rowIdCls, bodyBefore:me.bodyBefore, recordsExpanded:me.recordsExpanded, rowBodyHiddenCls:me.rowBodyHiddenCls, rowCollapsedCls:me.rowCollapsedCls, setupRowData:me.getRowBodyFeatureData, setup:me.setup};
+  features.push(Ext.apply({lockableScope:'normal', getRowBodyContents:me.getRowBodyContentsFn(me.rowBodyTpl)}, featuresCfg));
+  if (grid.enableLocking) {
+    features.push(Ext.apply({lockableScope:'locked', getRowBodyContents:me.lockedTpl ? me.getRowBodyContentsFn(me.lockedTpl) : function() {
+      return '';
+    }}, featuresCfg));
+  }
+  return features;
+}, getRowBodyContentsFn:function(rowBodyTpl) {
+  var me = this;
+  return function(rowValues) {
+    rowBodyTpl.owner = me;
+    return rowBodyTpl.applyTemplate(rowValues.record.getData());
+  };
+}, init:function(grid) {
+  var me = this, ownerLockable = grid.lockable && grid, view, lockedView, normalView;
+  if (ownerLockable) {
+    me.lockedGrid = ownerLockable.lockedGrid;
+    me.normalGrid = ownerLockable.normalGrid;
+    lockedView = me.lockedView = me.lockedGrid.getView();
+    normalView = me.normalView = me.normalGrid.getView();
+  }
+  me.callParent([grid]);
+  me.grid = grid;
+  view = me.view = grid.getView();
+  if (ownerLockable) {
+    me.bindView(lockedView);
+    me.bindView(normalView);
+    me.addExpander(me.lockedGrid.headerCt.items.getCount() ? me.lockedGrid : me.normalGrid);
+    lockedView.addRowTpl(me.addCollapsedCls).rowExpander = normalView.addRowTpl(me.addCollapsedCls).rowExpander = lockedView.rowExpander = normalView.rowExpander = me;
+    ownerLockable.mon(ownerLockable, {processcolumns:me.onLockableProcessColumns, lockcolumn:me.onColumnLock, unlockcolumn:me.onColumnUnlock, scope:me});
+  } else {
+    me.bindView(view);
+    view.addRowTpl(me.addCollapsedCls).rowExpander = view.rowExpander = me;
+    me.addExpander(grid);
+    grid.on('beforereconfigure', me.beforeReconfigure, me);
+  }
+}, onItemAdd:function(newRecords, startIndex, newItems) {
+  var me = this, ownerLockable = me.grid.lockable, len = newItems.length, record, i;
+  for (i = 0; i < len; i++) {
+    record = newRecords[i];
+    if (!record.isNonData && me.recordsExpanded[record.internalId]) {
+      ownerLockable && (me.grid.syncRowHeightOnNextLayout = true);
+      return;
+    }
+  }
+}, beforeReconfigure:function(grid, store, columns, oldStore, oldColumns) {
+  var me = this;
+  if (columns) {
+    me.expanderColumn = new Ext.grid.column.Column(me.getHeaderConfig());
+    columns.unshift(me.expanderColumn);
+  }
+}, onLockableProcessColumns:function(lockable, lockedHeaders, normalHeaders) {
+  this.addExpander(lockedHeaders.length ? lockable.lockedGrid : lockable.normalGrid);
+}, addExpander:function(expanderGrid) {
+  var me = this, selModel = expanderGrid.getSelectionModel(), checkBoxPosition = selModel.injectCheckbox;
+  me.expanderColumn = expanderGrid.headerCt.insert(0, me.getHeaderConfig());
+  if (checkBoxPosition === 0 || checkBoxPosition === 'first') {
+    checkBoxPosition = 1;
+  }
+  selModel.injectCheckbox = checkBoxPosition;
+}, getRowBodyFeatureData:function(record, idx, rowValues) {
+  var me = this;
+  me.self.prototype.setupRowData.apply(me, arguments);
+  rowValues.rowBody = me.getRowBodyContents(rowValues);
+  rowValues.rowBodyCls = me.recordsExpanded[record.internalId] ? '' : me.rowBodyHiddenCls;
+}, bindView:function(view) {
+  var me = this, listeners = {itemkeydown:me.onKeyDown, scope:me};
+  if (me.expandOnDblClick) {
+    listeners.itemdblclick = me.onDblClick;
+  }
+  if (me.grid.lockable) {
+    listeners.itemadd = me.onItemAdd;
+  }
+  view.on(listeners);
+}, onKeyDown:function(view, record, row, rowIdx, e) {
+  var me = this, key = e.getKey(), pos = view.getNavigationModel().getPosition(), isCollapsed;
+  if (pos) {
+    row = Ext.fly(row);
+    isCollapsed = row.hasCls(me.rowCollapsedCls);
+    if ((key === 107 || key === 187 && e.shiftKey) && isCollapsed || (key === 109 || key === 189) && !isCollapsed) {
+      me.toggleRow(rowIdx, record);
+    }
+  }
+}, onDblClick:function(view, record, row, rowIdx, e) {
+  this.toggleRow(rowIdx, record);
+}, toggleRow:function(rowIdx, record) {
+  var me = this, view = me.normalView || me.view, fireView = view, rowNode = view.getNode(rowIdx), normalRow = Ext.fly(rowNode), lockedRow, nextBd = normalRow.down(me.rowBodyTrSelector, true), wasCollapsed = normalRow.hasCls(me.rowCollapsedCls), addOrRemoveCls = wasCollapsed ? 'removeCls' : 'addCls', ownerLockable = me.grid.lockable && me.grid;
+  normalRow[addOrRemoveCls](me.rowCollapsedCls);
+  Ext.fly(nextBd)[addOrRemoveCls](me.rowBodyHiddenCls);
+  me.recordsExpanded[record.internalId] = wasCollapsed;
+  Ext.suspendLayouts();
+  if (ownerLockable) {
+    fireView = ownerLockable.getView();
+    if (me.lockedGrid.isVisible()) {
+      view = me.lockedView;
+      view.lockingPartner.updateLayout();
+      lockedRow = Ext.fly(view.getNode(rowIdx));
+      if (lockedRow) {
+        lockedRow[addOrRemoveCls](me.rowCollapsedCls);
+        nextBd = lockedRow.down(me.rowBodyTrSelector, true);
+        Ext.fly(nextBd)[addOrRemoveCls](me.rowBodyHiddenCls);
+      }
+    }
+    ownerLockable.syncRowHeightOnNextLayout = true;
+  }
+  fireView.fireEvent(wasCollapsed ? 'expandbody' : 'collapsebody', rowNode, record, nextBd);
+  view.refreshSize(true);
+  Ext.resumeLayouts(true);
+  if (me.scrollIntoViewOnExpand && wasCollapsed) {
+    me.grid.ensureVisible(rowIdx);
+  }
+}, syncRowHeights:function(lockedItem, normalItem) {
+  var me = this, lockedBd = Ext.fly(lockedItem).down(me.rowBodyTrSelector), normalBd = Ext.fly(normalItem).down(me.rowBodyTrSelector), lockedHeight, normalHeight;
+  if (normalBd.isVisible()) {
+    if ((lockedHeight = lockedBd.getHeight()) !== (normalHeight = normalBd.getHeight())) {
+      if (lockedHeight > normalHeight) {
+        normalBd.setHeight(lockedHeight);
+      } else {
+        lockedBd.setHeight(normalHeight);
+      }
+    }
+  } else {
+    lockedBd.dom.style.height = normalBd.dom.style.height = '';
+  }
+}, onColumnUnlock:function(lockable, column) {
+  var me = this, lockedColumns;
+  lockable = lockable || me.grid;
+  lockedColumns = lockable.lockedGrid.visibleColumnManager.getColumns();
+  if (lockedColumns.length === 1) {
+    lockable.normalGrid.removeCls(Ext.baseCSSPrefix + 'grid-hide-row-expander-spacer');
+    lockable.lockedGrid.addCls(Ext.baseCSSPrefix + 'grid-hide-row-expander-spacer');
+    if (lockedColumns[0] === me.expanderColumn) {
+      lockable.unlock(me.expanderColumn);
+    } else {
+      lockable.lock(me.expanderColumn, 0);
+    }
+  }
+}, onColumnLock:function(lockable, column) {
+  var me = this, lockedColumns;
+  lockable = lockable || me.grid;
+  lockedColumns = me.lockedGrid.visibleColumnManager.getColumns();
+  if (lockedColumns.length === 1) {
+    me.lockedGrid.headerCt.insert(0, me.expanderColumn);
+    lockable.normalGrid.addCls(Ext.baseCSSPrefix + 'grid-hide-row-expander-spacer');
+    lockable.lockedGrid.removeCls(Ext.baseCSSPrefix + 'grid-hide-row-expander-spacer');
+  }
+}, getHeaderConfig:function() {
+  var me = this, lockable = me.grid.lockable && me.grid;
+  return {width:me.headerWidth, ignoreExport:true, lockable:false, autoLock:true, sortable:false, resizable:false, draggable:false, hideable:false, menuDisabled:true, tdCls:Ext.baseCSSPrefix + 'grid-cell-special', innerCls:Ext.baseCSSPrefix + 'grid-cell-inner-row-expander', renderer:function() {
+    return '\x3cdiv class\x3d"' + Ext.baseCSSPrefix + 'grid-row-expander" role\x3d"presentation" tabIndex\x3d"0"\x3e\x3c/div\x3e';
+  }, processEvent:function(type, view, cell, rowIndex, cellIndex, e, record) {
+    var isTouch = e.pointerType === 'touch', isExpanderClick = !!e.getTarget('.' + Ext.baseCSSPrefix + 'grid-row-expander');
+    if (type === 'click' && isExpanderClick || type === 'keydown' && e.getKey() === e.SPACE) {
+      if (isTouch) {
+        cell.focus();
+      }
+      me.toggleRow(rowIndex, record, e);
+      e.stopSelection = !me.selectRowOnExpand;
+    } else {
+      if (e.type === 'mousedown' && !isTouch && isExpanderClick) {
+        e.preventDefault();
+      }
+    }
+  }, isLocked:function() {
+    return lockable && (lockable.lockedGrid.isVisible() || this.locked);
+  }, editRenderer:function() {
+    return '\x26#160;';
+  }};
+}});
+Ext.define('Ext.theme.triton.grid.plugin.RowExpander', {override:'Ext.grid.plugin.RowExpander', headerWidth:32});
+Ext.define('Ext.grid.plugin.RowWidget', {extend:Ext.grid.plugin.RowExpander, mixins:[Ext.mixin.Identifiable, Ext.mixin.StyleCacher], lockableScope:'top', alias:'plugin.rowwidget', config:{defaultWidgetUI:{}}, widget:null, lockedWidget:null, addCollapsedCls:{fn:function(out, values, parent) {
+  var me = this.rowExpander;
+  if (!me.recordsExpanded[values.record.internalId]) {
+    values.itemClasses.push(me.rowCollapsedCls);
+  }
+  this.nextTpl.applyOut(values, out, parent);
+}, priority:20000}, setCmp:function(grid) {
+  var me = this, features, widget;
+  me.rowIdCls = Ext.id(null, Ext.baseCSSPrefix + 'rowwidget-');
+  me.recordsExpanded = {};
+  Ext.plugin.Abstract.prototype.setCmp.apply(me, arguments);
+  widget = me.widget;
+  if (!widget || widget.isComponent) {
+    Ext.raise('RowWidget requires a widget configuration.');
+  }
+  me.widget = widget = Ext.apply({}, widget);
+  if (!widget.ui) {
+    widget.ui = me.getDefaultWidgetUI()[widget.xtype] || 'default';
+  }
+  if (grid.enableLocking && me.lockedWidget) {
+    me.lockedWidget = widget = Ext.apply({}, me.lockedWidget);
+    if (!widget.ui) {
+      widget.ui = me.getDefaultWidgetUI()[widget.xtype] || 'default';
+    }
+  }
+  features = me.getFeatureConfig(grid);
+  if (grid.features) {
+    grid.features = Ext.Array.push(features, grid.features);
+  } else {
+    grid.features = features;
+  }
+}, getFeatureConfig:function(grid) {
+  var me = this, features = [], featuresCfg = {ftype:'rowbody', rowExpander:me, doSync:false, rowIdCls:me.rowIdCls, bodyBefore:me.bodyBefore, recordsExpanded:me.recordsExpanded, rowBodyHiddenCls:me.rowBodyHiddenCls, rowCollapsedCls:me.rowCollapsedCls, setupRowData:me.setupRowData, setup:me.setup, onClick:Ext.emptyFn};
+  features.push(Ext.apply({lockableScope:'normal'}, featuresCfg));
+  if (grid.enableLocking) {
+    features.push(Ext.apply({lockableScope:'locked'}, featuresCfg));
+  }
+  return features;
+}, setupRowData:function(record, rowIndex, rowValues) {
+  var me = this.rowExpander;
+  me.rowBodyFeature = this;
+  rowValues.rowBodyCls = me.recordsExpanded[record.internalId] ? '' : me.rowBodyHiddenCls;
+}, bindView:function(view) {
+  var me = this;
+  me.viewListeners = view.on({refresh:me.onViewRefresh, itemadd:me.onItemAdd, scope:me, destroyable:true});
+  Ext.override(view, me.viewOverrides);
+}, destroy:function() {
+  var me = this, id = me.getId();
+  me.viewListeners.destroy();
+  if (me.grid.lockable) {
+    me.grid.destroyManagedWidgets(id + '-' + me.lockedView.getId());
+    me.grid.destroyManagedWidgets(id + '-' + me.normalView.getId());
+  } else {
+    me.grid.destroyManagedWidgets(id + '-' + me.view.getId());
+  }
+  me.callParent();
+}, privates:{viewOverrides:{handleEvent:function(e) {
+  if (e.getTarget('.' + this.rowExpander.rowIdCls, this.body)) {
+    return;
+  }
+  this.callParent([e]);
+}, onFocusEnter:function(e) {
+  if (e.event.getTarget('.' + this.rowExpander.rowIdCls, this.body)) {
+    return;
+  }
+  this.callParent([e]);
+}, toggleChildrenTabbability:function(enableTabbing) {
+  var focusEl = this.getTargetEl(), rows = this.all, restoreOptions = {skipSelf:true}, saveOptions = {skipSelf:true, includeSaved:false}, i;
+  for (i = rows.startIndex; i <= rows.endIndex; i++) {
+    focusEl = Ext.fly(this.getRow(rows.item(i)));
+    if (!focusEl) {
+      continue;
+    }
+    if (enableTabbing) {
+      focusEl.restoreTabbableState(restoreOptions);
+    } else {
+      focusEl.saveTabbableState(saveOptions);
+    }
+  }
+}}, destroyLiveWidget:function(recId, widget) {
+  widget.destroy();
+}, destroyFreeWidget:function(widget) {
+  widget.destroy();
+}, onItemAdd:function(newRecords, startIndex, newItems, view) {
+  var me = this, len = newItems.length, i, record, ownerLockable = me.grid.lockable;
+  Ext.suspendLayouts();
+  for (i = 0; i < len; i++) {
+    record = newRecords[i];
+    if (!record.isNonData && me.recordsExpanded[record.internalId]) {
+      if (ownerLockable) {
+        me.grid.syncRowHeightOnNextLayout = true;
+      }
+      me.addWidget(view, record);
+    }
+  }
+  Ext.resumeLayouts(true);
+}, onViewRefresh:function(view, records) {
+  var me = this, rows = view.all, itemIndex, recordIndex;
+  Ext.suspendLayouts();
+  for (itemIndex = rows.startIndex, recordIndex = 0; itemIndex <= rows.endIndex; itemIndex++, recordIndex++) {
+    if (me.recordsExpanded[records[recordIndex].internalId]) {
+      me.addWidget(view, records[recordIndex]);
+    }
+  }
+  Ext.resumeLayouts(true);
+}, returnFalse:function() {
+  return false;
+}, getWidget:function(view, record) {
+  var me = this, result, widget;
+  if (record) {
+    widget = me.grid.lockable && view === me.lockedView ? me.lockedWidget : me.widget;
+    if (widget) {
+      result = me.grid.createManagedWidget(view, me.getId() + '-' + view.getId(), widget, record);
+      result.measurer = me;
+      result.ownerLayout = view.componentLayout;
+    }
+  }
+  return result;
+}, addWidget:function(view, record) {
+  var me = this, target, width, widget, hasAttach = !!me.onWidgetAttach, isFixedSize = me.isFixedSize, el;
+  if (record.isNonData || !me.recordsExpanded[record.internalId]) {
+    return;
+  }
+  target = Ext.fly(view.getNode(record).querySelector(me.rowBodyFeature.innerSelector));
+  width = target.getWidth(true) - target.getPadding('lr');
+  widget = me.getWidget(view, record);
+  if (widget) {
+    if (hasAttach) {
+      Ext.callback(me.onWidgetAttach, me.scope, [me, widget, record], 0, me);
+    }
+    el = widget.el || widget.element;
+    if (el) {
+      target.dom.appendChild(el.dom);
+      if (!isFixedSize && widget.width !== width) {
+        widget.setWidth(width);
+      } else {
+        widget.updateLayout();
+      }
+      widget.reattachToBody();
+    } else {
+      if (!isFixedSize) {
+        widget.width = width;
+      }
+      widget.render(target);
+    }
+    widget.updateLayout();
+  }
+  return widget;
+}, toggleRow:function(rowIdx, record) {
+  var me = this, view = me.normalView || me.view, rowNode = view.getNode(rowIdx), normalRow = Ext.fly(rowNode), lockedRow, nextBd = normalRow.down(me.rowBodyTrSelector, true), wasCollapsed = normalRow.hasCls(me.rowCollapsedCls), addOrRemoveCls = wasCollapsed ? 'removeCls' : 'addCls', ownerLockable = me.grid.lockable && me.grid, widget, vm;
+  normalRow[addOrRemoveCls](me.rowCollapsedCls);
+  Ext.fly(nextBd)[addOrRemoveCls](me.rowBodyHiddenCls);
+  Ext.suspendLayouts();
+  if (wasCollapsed) {
+    me.recordsExpanded[record.internalId] = true;
+    widget = me.addWidget(view, record);
+    vm = widget.lookupViewModel();
+  } else {
+    delete me.recordsExpanded[record.internalId];
+    widget = me.getWidget(view, record);
+  }
+  if (ownerLockable) {
+    if (ownerLockable.lockedGrid.isVisible()) {
+      view = me.lockedView;
+      lockedRow = Ext.fly(view.getNode(rowIdx));
+      if (lockedRow) {
+        lockedRow[addOrRemoveCls](me.rowCollapsedCls);
+        nextBd = lockedRow.down(me.rowBodyTrSelector, true);
+        Ext.fly(nextBd)[addOrRemoveCls](me.rowBodyHiddenCls);
+        if (wasCollapsed && me.lockedWidget) {
+          widget = [widget, me.addWidget(view, record)];
+        } else {
+          widget = [widget, me.getWidget(view, record)];
+        }
+      }
+      ownerLockable.syncRowHeightOnNextLayout = true;
+    }
+  }
+  me.view.fireEvent(wasCollapsed ? 'expandbody' : 'collapsebody', rowNode, record, nextBd, widget);
+  view.updateLayout();
+  if (vm) {
+    vm.notify();
+  }
+  Ext.resumeLayouts(true);
+  if (me.scrollIntoViewOnExpand && wasCollapsed) {
+    me.grid.ensureVisible(rowIdx);
+  }
+}}});
 Ext.define('Ext.util.Queue', {constructor:function() {
   this.clear();
 }, add:function(obj, replace) {
@@ -98688,6 +99153,284 @@ Ext.define('Ext.chart.overrides.AbstractChart', {override:'Ext.chart.AbstractCha
   this.destroyChart();
   this.callParent();
 }});
+Ext.define('Ext.chart.grid.HorizontalGrid', {extend:Ext.draw.sprite.Sprite, alias:'grid.horizontal', inheritableStatics:{def:{processors:{x:'number', y:'number', width:'number', height:'number'}, defaults:{x:0, y:0, width:1, height:1, strokeStyle:'#DDD'}}}, render:function(surface, ctx, rect) {
+  var attr = this.attr, y = surface.roundPixel(attr.y), halfLineWidth = ctx.lineWidth * 0.5;
+  ctx.beginPath();
+  ctx.rect(rect[0] - surface.matrix.getDX(), y + halfLineWidth, +rect[2], attr.height);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(rect[0] - surface.matrix.getDX(), y + halfLineWidth);
+  ctx.lineTo(rect[0] + rect[2] - surface.matrix.getDX(), y + halfLineWidth);
+  ctx.stroke();
+}});
+Ext.define('Ext.chart.grid.VerticalGrid', {extend:Ext.draw.sprite.Sprite, alias:'grid.vertical', inheritableStatics:{def:{processors:{x:'number', y:'number', width:'number', height:'number'}, defaults:{x:0, y:0, width:1, height:1, strokeStyle:'#DDD'}}}, render:function(surface, ctx, rect) {
+  var attr = this.attr, x = surface.roundPixel(attr.x), halfLineWidth = ctx.lineWidth * 0.5;
+  ctx.beginPath();
+  ctx.rect(x - halfLineWidth, rect[1] - surface.matrix.getDY(), attr.width, rect[3]);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(x - halfLineWidth, rect[1] - surface.matrix.getDY());
+  ctx.lineTo(x - halfLineWidth, rect[1] + rect[3] - surface.matrix.getDY());
+  ctx.stroke();
+}});
+Ext.define('Ext.chart.CartesianChart', {extend:Ext.chart.AbstractChart, alternateClassName:'Ext.chart.Chart', xtype:['cartesian', 'chart'], isCartesian:true, config:{flipXY:false, innerRect:[0, 0, 1, 1], innerPadding:{top:0, left:0, right:0, bottom:0}}, applyInnerPadding:function(padding, oldPadding) {
+  if (!Ext.isObject(padding)) {
+    return Ext.util.Format.parseBox(padding);
+  } else {
+    if (!oldPadding) {
+      return padding;
+    } else {
+      return Ext.apply(oldPadding, padding);
+    }
+  }
+}, getDirectionForAxis:function(position) {
+  var flipXY = this.getFlipXY(), direction;
+  if (position === 'left' || position === 'right') {
+    direction = flipXY ? 'X' : 'Y';
+  } else {
+    direction = flipXY ? 'Y' : 'X';
+  }
+  return direction;
+}, performLayout:function() {
+  var me = this;
+  if (me.callParent() === false) {
+    return;
+  }
+  me.chartLayoutCount++;
+  me.suspendAnimation();
+  var chartRect = me.getSurface('chart').getRect(), left = chartRect[0], top = chartRect[1], width = chartRect[2], height = chartRect[3], captionList = me.captionList, axes = me.getAxes(), axis, seriesList = me.getSeries(), series, axisSurface, thickness, insetPadding = me.getInsetPadding(), innerPadding = me.getInnerPadding(), surface, gridSurface, shrinkBox = Ext.apply({}, insetPadding), mainRect, innerWidth, innerHeight, elements, floating, floatingValue, matrix, i, ln, isRtl = me.getInherited().rtl, 
+  flipXY = me.getFlipXY(), caption;
+  if (width <= 0 || height <= 0) {
+    return;
+  }
+  me.suspendThicknessChanged();
+  for (i = 0; i < axes.length; i++) {
+    axis = axes[i];
+    axisSurface = axis.getSurface();
+    floating = axis.getFloating();
+    floatingValue = floating ? floating.value : null;
+    thickness = axis.getThickness();
+    switch(axis.getPosition()) {
+      case 'top':
+        axisSurface.setRect([left, top + shrinkBox.top + 1, width, thickness]);
+        break;
+      case 'bottom':
+        axisSurface.setRect([left, top + height - (shrinkBox.bottom + thickness), width, thickness]);
+        break;
+      case 'left':
+        axisSurface.setRect([left + shrinkBox.left, top, thickness, height]);
+        break;
+      case 'right':
+        axisSurface.setRect([left + width - (shrinkBox.right + thickness), top, thickness, height]);
+        break;
+    }
+    if (floatingValue === null) {
+      shrinkBox[axis.getPosition()] += thickness;
+    }
+  }
+  width -= shrinkBox.left + shrinkBox.right;
+  height -= shrinkBox.top + shrinkBox.bottom;
+  mainRect = [left + shrinkBox.left, top + shrinkBox.top, width, height];
+  shrinkBox.left += innerPadding.left;
+  shrinkBox.top += innerPadding.top;
+  shrinkBox.right += innerPadding.right;
+  shrinkBox.bottom += innerPadding.bottom;
+  innerWidth = width - innerPadding.left - innerPadding.right;
+  innerHeight = height - innerPadding.top - innerPadding.bottom;
+  me.setInnerRect([shrinkBox.left, shrinkBox.top, innerWidth, innerHeight]);
+  if (innerWidth <= 0 || innerHeight <= 0) {
+    return;
+  }
+  me.setMainRect(mainRect);
+  me.getSurface().setRect(mainRect);
+  for (i = 0, ln = me.surfaceMap.grid && me.surfaceMap.grid.length; i < ln; i++) {
+    gridSurface = me.surfaceMap.grid[i];
+    gridSurface.setRect(mainRect);
+    gridSurface.matrix.set(1, 0, 0, 1, innerPadding.left, innerPadding.top);
+    gridSurface.matrix.inverse(gridSurface.inverseMatrix);
+  }
+  for (i = 0; i < axes.length; i++) {
+    axis = axes[i];
+    axis.getRange(true);
+    axisSurface = axis.getSurface();
+    matrix = axisSurface.matrix;
+    elements = matrix.elements;
+    switch(axis.getPosition()) {
+      case 'top':
+      case 'bottom':
+        elements[4] = shrinkBox.left;
+        axis.setLength(innerWidth);
+        break;
+      case 'left':
+      case 'right':
+        elements[5] = shrinkBox.top;
+        axis.setLength(innerHeight);
+        break;
+    }
+    axis.updateTitleSprite();
+    matrix.inverse(axisSurface.inverseMatrix);
+  }
+  for (i = 0, ln = seriesList.length; i < ln; i++) {
+    series = seriesList[i];
+    surface = series.getSurface();
+    surface.setRect(mainRect);
+    if (flipXY) {
+      if (isRtl) {
+        surface.matrix.set(0, -1, -1, 0, innerPadding.left + innerWidth, innerPadding.top + innerHeight);
+      } else {
+        surface.matrix.set(0, -1, 1, 0, innerPadding.left, innerPadding.top + innerHeight);
+      }
+    } else {
+      surface.matrix.set(1, 0, 0, -1, innerPadding.left, innerPadding.top + innerHeight);
+    }
+    surface.matrix.inverse(surface.inverseMatrix);
+    series.getOverlaySurface().setRect(mainRect);
+  }
+  if (captionList) {
+    for (i = 0, ln = captionList.length; i < ln; i++) {
+      caption = captionList[i];
+      if (caption.getAlignTo() === 'series') {
+        caption.alignRect(mainRect);
+      }
+      caption.performLayout();
+    }
+  }
+  me.afterChartLayout();
+  me.redraw();
+  me.resumeAnimation();
+  me.resumeThicknessChanged();
+  me.chartLayoutCount--;
+  me.checkLayoutEnd();
+}, afterChartLayout:Ext.emptyFn, refloatAxes:function() {
+  var me = this, axes = me.getAxes(), axesCount = axes && axes.length || 0, axis, axisSurface, axisRect, floating, value, alongAxis, matrix, chartRect = me.getChartRect(), inset = me.getInsetPadding(), inner = me.getInnerPadding(), width = chartRect[2] - inset.left - inset.right, height = chartRect[3] - inset.top - inset.bottom, isHorizontal, i;
+  for (i = 0; i < axesCount; i++) {
+    axis = axes[i];
+    floating = axis.getFloating();
+    value = floating ? floating.value : null;
+    if (value === null) {
+      axis.floatingAtCoord = null;
+      continue;
+    }
+    axisSurface = axis.getSurface();
+    axisRect = axisSurface.getRect();
+    if (!axisRect) {
+      continue;
+    }
+    axisRect = axisRect.slice();
+    alongAxis = me.getAxis(floating.alongAxis);
+    if (alongAxis) {
+      isHorizontal = alongAxis.getAlignment() === 'horizontal';
+      if (Ext.isString(value)) {
+        value = alongAxis.getCoordFor(value);
+      }
+      alongAxis.floatingAxes[axis.getId()] = value;
+      matrix = alongAxis.getSprites()[0].attr.matrix;
+      if (isHorizontal) {
+        value = value * matrix.getXX() + matrix.getDX();
+        axis.floatingAtCoord = value + inner.left + inner.right;
+      } else {
+        value = value * matrix.getYY() + matrix.getDY();
+        axis.floatingAtCoord = value + inner.top + inner.bottom;
+      }
+    } else {
+      isHorizontal = axis.getAlignment() === 'horizontal';
+      if (isHorizontal) {
+        axis.floatingAtCoord = value + inner.top + inner.bottom;
+      } else {
+        axis.floatingAtCoord = value + inner.left + inner.right;
+      }
+      value = axisSurface.roundPixel(0.01 * value * (isHorizontal ? height : width));
+    }
+    switch(axis.getPosition()) {
+      case 'top':
+        axisRect[1] = inset.top + inner.top + value - axisRect[3] + 1;
+        break;
+      case 'bottom':
+        axisRect[1] = inset.top + inner.top + (alongAxis ? value : height - value);
+        break;
+      case 'left':
+        axisRect[0] = inset.left + inner.left + value - axisRect[2];
+        break;
+      case 'right':
+        axisRect[0] = inset.left + inner.left + (alongAxis ? value : width - value) - 1;
+        break;
+    }
+    axisSurface.setRect(axisRect);
+  }
+}, redraw:function() {
+  var me = this, seriesList = me.getSeries(), axes = me.getAxes(), rect = me.getMainRect(), innerWidth, innerHeight, innerPadding = me.getInnerPadding(), sprites, xRange, yRange, isSide, attr, i, j, ln, axis, axisX, axisY, range, visibleRange, flipXY = me.getFlipXY(), zBase = 1000, zIndex, markersZIndex, series, sprite, markers;
+  if (!rect) {
+    return;
+  }
+  innerWidth = rect[2] - innerPadding.left - innerPadding.right;
+  innerHeight = rect[3] - innerPadding.top - innerPadding.bottom;
+  for (i = 0; i < seriesList.length; i++) {
+    series = seriesList[i];
+    axisX = series.getXAxis();
+    if (axisX) {
+      visibleRange = axisX.getVisibleRange();
+      xRange = axisX.getRange();
+      xRange = [xRange[0] + (xRange[1] - xRange[0]) * visibleRange[0], xRange[0] + (xRange[1] - xRange[0]) * visibleRange[1]];
+    } else {
+      xRange = series.getXRange();
+    }
+    axisY = series.getYAxis();
+    if (axisY) {
+      visibleRange = axisY.getVisibleRange();
+      yRange = axisY.getRange();
+      yRange = [yRange[0] + (yRange[1] - yRange[0]) * visibleRange[0], yRange[0] + (yRange[1] - yRange[0]) * visibleRange[1]];
+    } else {
+      yRange = series.getYRange();
+    }
+    attr = {visibleMinX:xRange[0], visibleMaxX:xRange[1], visibleMinY:yRange[0], visibleMaxY:yRange[1], innerWidth:innerWidth, innerHeight:innerHeight, flipXY:flipXY};
+    sprites = series.getSprites();
+    for (j = 0, ln = sprites.length; j < ln; j++) {
+      sprite = sprites[j];
+      zIndex = sprite.attr.zIndex;
+      if (zIndex < zBase) {
+        zIndex += (i + 1) * 100 + zBase;
+        sprite.attr.zIndex = zIndex;
+        markers = sprite.getMarker('items');
+        if (markers) {
+          markersZIndex = markers.attr.zIndex;
+          if (markersZIndex === Number.MAX_VALUE) {
+            markers.attr.zIndex = zIndex;
+          } else {
+            if (markersZIndex < zBase) {
+              markers.attr.zIndex = zIndex + markersZIndex;
+            }
+          }
+        }
+      }
+      sprite.setAttributes(attr, true);
+    }
+  }
+  for (i = 0; i < axes.length; i++) {
+    axis = axes[i];
+    isSide = axis.isSide();
+    sprites = axis.getSprites();
+    range = axis.getRange();
+    visibleRange = axis.getVisibleRange();
+    attr = {dataMin:range[0], dataMax:range[1], visibleMin:visibleRange[0], visibleMax:visibleRange[1]};
+    if (isSide) {
+      attr.length = innerHeight;
+      attr.startGap = innerPadding.bottom;
+      attr.endGap = innerPadding.top;
+    } else {
+      attr.length = innerWidth;
+      attr.startGap = innerPadding.left;
+      attr.endGap = innerPadding.right;
+    }
+    for (j = 0, ln = sprites.length; j < ln; j++) {
+      sprites[j].setAttributes(attr, true);
+    }
+  }
+  me.renderFrame();
+  me.callParent();
+}, renderFrame:function() {
+  this.refloatAxes();
+  this.callParent();
+}});
 Ext.define('Ext.chart.grid.CircularGrid', {extend:Ext.draw.sprite.Circle, alias:'grid.circular', inheritableStatics:{def:{defaults:{r:1, strokeStyle:'#DDD'}}}});
 Ext.define('Ext.chart.grid.RadialGrid', {extend:Ext.draw.sprite.Path, alias:'grid.radial', inheritableStatics:{def:{processors:{startRadius:'number', endRadius:'number'}, defaults:{startRadius:0, endRadius:1, scalingCenterX:0, scalingCenterY:0, strokeStyle:'#DDD'}, triggers:{startRadius:'path,bbox', endRadius:'path,bbox'}}}, render:function() {
   this.callParent(arguments);
@@ -98886,6 +99629,1103 @@ Ext.define('Ext.chart.PolarChart', {extend:Ext.chart.AbstractChart, xtype:'polar
   this.refloatAxes();
   this.callParent();
 }});
+Ext.define('Ext.chart.SpaceFillingChart', {extend:Ext.chart.AbstractChart, xtype:'spacefilling', config:{}, performLayout:function() {
+  var me = this;
+  try {
+    me.chartLayoutCount++;
+    me.suspendAnimation();
+    if (me.callParent() === false) {
+      return;
+    }
+    var chartRect = me.getSurface('chart').getRect(), padding = me.getInsetPadding(), width = chartRect[2] - padding.left - padding.right, height = chartRect[3] - padding.top - padding.bottom, mainRect = [padding.left, padding.top, width, height], seriesList = me.getSeries(), series, i, ln;
+    me.getSurface().setRect(mainRect);
+    me.setMainRect(mainRect);
+    for (i = 0, ln = seriesList.length; i < ln; i++) {
+      series = seriesList[i];
+      series.getSurface().setRect(mainRect);
+      if (series.setRect) {
+        series.setRect(mainRect);
+      }
+      series.getOverlaySurface().setRect(chartRect);
+    }
+    me.redraw();
+  } finally {
+    me.resumeAnimation();
+    me.chartLayoutCount--;
+    me.checkLayoutEnd();
+  }
+}, redraw:function() {
+  var me = this, seriesList = me.getSeries(), series, i, ln;
+  for (i = 0, ln = seriesList.length; i < ln; i++) {
+    series = seriesList[i];
+    series.getSprites();
+  }
+  me.renderFrame();
+  me.callParent();
+}});
+Ext.define('Ext.chart.axis.sprite.Axis3D', {extend:Ext.chart.axis.sprite.Axis, alias:'sprite.axis3d', type:'axis3d', inheritableStatics:{def:{processors:{depth:'number'}, defaults:{depth:0}, triggers:{depth:'layout'}}}, config:{animation:{customDurations:{depth:0}}}, layoutUpdater:function() {
+  var me = this, chart = me.getAxis().getChart();
+  if (chart.isInitializing) {
+    return;
+  }
+  var attr = me.attr, layout = me.getLayout(), depth = layout.isDiscrete ? 0 : attr.depth, isRtl = chart.getInherited().rtl, min = attr.dataMin + (attr.dataMax - attr.dataMin) * attr.visibleMin, max = attr.dataMin + (attr.dataMax - attr.dataMin) * attr.visibleMax, context = {attr:attr, segmenter:me.getSegmenter(), renderer:me.defaultRenderer};
+  if (attr.position === 'left' || attr.position === 'right') {
+    attr.translationX = 0;
+    attr.translationY = max * (attr.length - depth) / (max - min) + depth;
+    attr.scalingX = 1;
+    attr.scalingY = (-attr.length + depth) / (max - min);
+    attr.scalingCenterY = 0;
+    attr.scalingCenterX = 0;
+    me.applyTransformations(true);
+  } else {
+    if (attr.position === 'top' || attr.position === 'bottom') {
+      if (isRtl) {
+        attr.translationX = attr.length + min * attr.length / (max - min) + 1;
+      } else {
+        attr.translationX = -min * attr.length / (max - min);
+      }
+      attr.translationY = 0;
+      attr.scalingX = (isRtl ? -1 : 1) * (attr.length - depth) / (max - min);
+      attr.scalingY = 1;
+      attr.scalingCenterY = 0;
+      attr.scalingCenterX = 0;
+      me.applyTransformations(true);
+    }
+  }
+  if (layout) {
+    layout.calculateLayout(context);
+    me.setLayoutContext(context);
+  }
+}, renderAxisLine:function(surface, ctx, layout, clipRect) {
+  var me = this, attr = me.attr, halfLineWidth = attr.lineWidth * 0.5, layout = me.getLayout(), depth = layout.isDiscrete ? 0 : attr.depth, docked = attr.position, position, gaugeAngles;
+  if (attr.axisLine && attr.length) {
+    switch(docked) {
+      case 'left':
+        position = surface.roundPixel(clipRect[2]) - halfLineWidth;
+        ctx.moveTo(position, -attr.endGap + depth);
+        ctx.lineTo(position, attr.length + attr.startGap);
+        break;
+      case 'right':
+        ctx.moveTo(halfLineWidth, -attr.endGap);
+        ctx.lineTo(halfLineWidth, attr.length + attr.startGap);
+        break;
+      case 'bottom':
+        ctx.moveTo(-attr.startGap, halfLineWidth);
+        ctx.lineTo(attr.length - depth + attr.endGap, halfLineWidth);
+        break;
+      case 'top':
+        position = surface.roundPixel(clipRect[3]) - halfLineWidth;
+        ctx.moveTo(-attr.startGap, position);
+        ctx.lineTo(attr.length + attr.endGap, position);
+        break;
+      case 'angular':
+        ctx.moveTo(attr.centerX + attr.length, attr.centerY);
+        ctx.arc(attr.centerX, attr.centerY, attr.length, 0, Math.PI * 2, true);
+        break;
+      case 'gauge':
+        gaugeAngles = me.getGaugeAngles();
+        ctx.moveTo(attr.centerX + Math.cos(gaugeAngles.start) * attr.length, attr.centerY + Math.sin(gaugeAngles.start) * attr.length);
+        ctx.arc(attr.centerX, attr.centerY, attr.length, gaugeAngles.start, gaugeAngles.end, true);
+        break;
+    }
+  }
+}});
+Ext.define('Ext.chart.axis.Axis3D', {extend:Ext.chart.axis.Axis, xtype:'axis3d', config:{depth:0}, onSeriesChange:function(chart) {
+  var me = this, eventName = 'depthchange', listenerName = 'onSeriesDepthChange', i, series;
+  function toggle(action) {
+    var boundSeries = me.boundSeries;
+    for (i = 0; i < boundSeries.length; i++) {
+      series = boundSeries[i];
+      series[action](eventName, listenerName, me);
+    }
+  }
+  toggle('un');
+  me.callParent(arguments);
+  toggle('on');
+}, onSeriesDepthChange:function(series, depth) {
+  var me = this, maxDepth = depth, boundSeries = me.boundSeries, i, item;
+  if (depth > me.getDepth()) {
+    maxDepth = depth;
+  } else {
+    for (i = 0; i < boundSeries.length; i++) {
+      item = boundSeries[i];
+      if (item !== series && item.getDepth) {
+        depth = item.getDepth();
+        if (depth > maxDepth) {
+          maxDepth = depth;
+        }
+      }
+    }
+  }
+  me.setDepth(maxDepth);
+}, updateDepth:function(depth) {
+  var me = this, sprites = me.getSprites(), attr = {depth:depth};
+  if (sprites && sprites.length) {
+    sprites[0].setAttributes(attr);
+  }
+  if (me.gridSpriteEven && me.gridSpriteOdd) {
+    me.gridSpriteEven.getTemplate().setAttributes(attr);
+    me.gridSpriteOdd.getTemplate().setAttributes(attr);
+  }
+}, getGridAlignment:function() {
+  switch(this.getPosition()) {
+    case 'left':
+    case 'right':
+      return 'horizontal3d';
+    case 'top':
+    case 'bottom':
+      return 'vertical3d';
+  }
+}});
+Ext.define('Ext.chart.axis.Category', {extend:Ext.chart.axis.Axis, alias:'axis.category', type:'category', isCategory:true, config:{layout:'combineDuplicate', segmenter:'names'}});
+Ext.define('Ext.chart.axis.Category3D', {extend:Ext.chart.axis.Axis3D, alias:'axis.category3d', type:'category3d', config:{layout:'combineDuplicate', segmenter:'names'}});
+Ext.define('Ext.chart.axis.Numeric', {extend:Ext.chart.axis.Axis, type:'numeric', alias:['axis.numeric', 'axis.radial'], config:{layout:'continuous', segmenter:'numeric', aggregator:'double'}});
+Ext.define('Ext.chart.axis.Numeric3D', {extend:Ext.chart.axis.Axis3D, alias:['axis.numeric3d'], type:'numeric3d', config:{layout:'continuous', segmenter:'numeric', aggregator:'double'}});
+Ext.define('Ext.chart.axis.Time', {extend:Ext.chart.axis.Numeric, alias:'axis.time', type:'time', config:{dateFormat:null, fromDate:null, toDate:null, layout:'continuous', segmenter:'time', aggregator:'time'}, updateDateFormat:function(format) {
+  var renderer = this.getRenderer();
+  if (!renderer || renderer.isDefault) {
+    renderer = function(axis, date) {
+      return Ext.Date.format(new Date(date), format);
+    };
+    renderer.isDefault = true;
+    this.setRenderer(renderer);
+    this.performLayout();
+  }
+}, updateRenderer:function(renderer) {
+  var dateFormat = this.getDateFormat();
+  if (renderer) {
+    this.performLayout();
+  } else {
+    if (dateFormat) {
+      this.updateDateFormat(dateFormat);
+    }
+  }
+}, updateFromDate:function(date) {
+  this.setMinimum(+date);
+}, updateToDate:function(date) {
+  this.setMaximum(+date);
+}, getCoordFor:function(value) {
+  if (Ext.isString(value)) {
+    value = new Date(value);
+  }
+  return +value;
+}});
+Ext.define('Ext.chart.axis.Time3D', {extend:Ext.chart.axis.Numeric3D, alias:'axis.time3d', type:'time3d', config:{dateFormat:null, fromDate:null, toDate:null, layout:'continuous', segmenter:'time', aggregator:'time'}, updateDateFormat:function(format) {
+  this.setRenderer(function(axis, date) {
+    return Ext.Date.format(new Date(date), format);
+  });
+}, updateFromDate:function(date) {
+  this.setMinimum(+date);
+}, updateToDate:function(date) {
+  this.setMaximum(+date);
+}, getCoordFor:function(value) {
+  if (Ext.isString(value)) {
+    value = new Date(value);
+  }
+  return +value;
+}});
+Ext.define('Ext.chart.grid.HorizontalGrid3D', {extend:Ext.chart.grid.HorizontalGrid, alias:'grid.horizontal3d', inheritableStatics:{def:{processors:{depth:'number'}, defaults:{depth:0}}}, render:function(surface, ctx, rect) {
+  var attr = this.attr, x = surface.roundPixel(attr.x), y = surface.roundPixel(attr.y), dx = surface.matrix.getDX(), halfLineWidth = ctx.lineWidth * 0.5, height = attr.height, depth = attr.depth, left, top;
+  if (y <= rect[1]) {
+    return;
+  }
+  left = rect[0] + depth - dx;
+  top = y + halfLineWidth - depth;
+  ctx.beginPath();
+  ctx.rect(left, top, rect[2], height);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(left, top);
+  ctx.lineTo(left + rect[2], top);
+  ctx.stroke();
+  left = rect[0] + x - dx;
+  top = y + halfLineWidth;
+  ctx.beginPath();
+  ctx.moveTo(left, top);
+  ctx.lineTo(left + depth, top - depth);
+  ctx.lineTo(left + depth, top - depth + height);
+  ctx.lineTo(left, top + height);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(left, top);
+  ctx.lineTo(left + depth, top - depth);
+  ctx.stroke();
+}});
+Ext.define('Ext.chart.grid.VerticalGrid3D', {extend:Ext.chart.grid.VerticalGrid, alias:'grid.vertical3d', inheritableStatics:{def:{processors:{depth:'number'}, defaults:{depth:0}}}, render:function(surface, ctx, clipRect) {
+  var attr = this.attr, x = surface.roundPixel(attr.x), dy = surface.matrix.getDY(), halfLineWidth = ctx.lineWidth * 0.5, width = attr.width, depth = attr.depth, left, top;
+  if (x >= clipRect[2]) {
+    return;
+  }
+  left = x - halfLineWidth + depth;
+  top = clipRect[1] - depth - dy;
+  ctx.beginPath();
+  ctx.rect(left, top, width, clipRect[3]);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(left, top);
+  ctx.lineTo(left, top + clipRect[3]);
+  ctx.stroke();
+  left = x - halfLineWidth;
+  top = clipRect[3];
+  ctx.beginPath();
+  ctx.moveTo(left, top);
+  ctx.lineTo(left + depth, top - depth);
+  ctx.lineTo(left + depth + width, top - depth);
+  ctx.lineTo(left + width, top);
+  ctx.closePath();
+  ctx.fill();
+  left = x - halfLineWidth;
+  top = clipRect[3];
+  ctx.beginPath();
+  ctx.moveTo(left, top);
+  ctx.lineTo(left + depth, top - depth);
+  ctx.stroke();
+}});
+Ext.define('Ext.chart.interactions.CrossZoom', {extend:Ext.chart.interactions.Abstract, type:'crosszoom', alias:'interaction.crosszoom', isCrossZoom:true, config:{axes:true, gestures:{dragstart:'onGestureStart', drag:'onGesture', dragend:'onGestureEnd', dblclick:'onDoubleTap'}, undoButton:{}}, stopAnimationBeforeSync:false, zoomAnimationInProgress:false, constructor:function() {
+  this.callParent(arguments);
+  this.zoomHistory = [];
+}, applyAxes:function(axesConfig) {
+  var result = {};
+  if (axesConfig === true) {
+    return {top:{}, right:{}, bottom:{}, left:{}};
+  } else {
+    if (Ext.isArray(axesConfig)) {
+      result = {};
+      Ext.each(axesConfig, function(axis) {
+        result[axis] = {};
+      });
+    } else {
+      if (Ext.isObject(axesConfig)) {
+        Ext.iterate(axesConfig, function(key, val) {
+          if (val === true) {
+            result[key] = {};
+          } else {
+            if (val !== false) {
+              result[key] = val;
+            }
+          }
+        });
+      }
+    }
+  }
+  return result;
+}, applyUndoButton:function(button, oldButton) {
+  var me = this;
+  if (oldButton) {
+    oldButton.destroy();
+  }
+  if (button) {
+    return Ext.create('Ext.Button', Ext.apply({cls:[], text:'Undo Zoom', disabled:true, handler:function() {
+      me.undoZoom();
+    }}, button));
+  }
+}, getSurface:function() {
+  return this.getChart() && this.getChart().getSurface('overlay');
+}, setSeriesOpacity:function(opacity) {
+  var surface = this.getChart() && this.getChart().getSurface('series');
+  if (surface) {
+    surface.element.setStyle('opacity', opacity);
+  }
+}, onGestureStart:function(e) {
+  var me = this, chart = me.getChart(), surface = me.getSurface(), rect = chart.getInnerRect(), innerPadding = chart.getInnerPadding(), minX = innerPadding.left, maxX = minX + rect[2], minY = innerPadding.top, maxY = minY + rect[3], xy = chart.getEventXY(e), x = xy[0], y = xy[1];
+  e.claimGesture();
+  if (me.zoomAnimationInProgress) {
+    return;
+  }
+  if (x > minX && x < maxX && y > minY && y < maxY) {
+    me.gestureEvent = 'drag';
+    me.lockEvents(me.gestureEvent);
+    me.startX = x;
+    me.startY = y;
+    me.selectionRect = surface.add({type:'rect', globalAlpha:0.5, fillStyle:'rgba(80,80,140,0.5)', strokeStyle:'rgba(80,80,140,1)', lineWidth:2, x:x, y:y, width:0, height:0, zIndex:10000});
+    me.setSeriesOpacity(0.8);
+    return false;
+  }
+}, onGesture:function(e) {
+  var me = this;
+  if (me.zoomAnimationInProgress) {
+    return;
+  }
+  if (me.getLocks()[me.gestureEvent] === me) {
+    var chart = me.getChart(), surface = me.getSurface(), rect = chart.getInnerRect(), innerPadding = chart.getInnerPadding(), minX = innerPadding.left, maxX = minX + rect[2], minY = innerPadding.top, maxY = minY + rect[3], xy = chart.getEventXY(e), x = xy[0], y = xy[1];
+    if (x < minX) {
+      x = minX;
+    } else {
+      if (x > maxX) {
+        x = maxX;
+      }
+    }
+    if (y < minY) {
+      y = minY;
+    } else {
+      if (y > maxY) {
+        y = maxY;
+      }
+    }
+    me.selectionRect.setAttributes({width:x - me.startX, height:y - me.startY});
+    if (Math.abs(me.startX - x) < 11 || Math.abs(me.startY - y) < 11) {
+      me.selectionRect.setAttributes({globalAlpha:0.5});
+    } else {
+      me.selectionRect.setAttributes({globalAlpha:1});
+    }
+    surface.renderFrame();
+    return false;
+  }
+}, onGestureEnd:function(e) {
+  var me = this;
+  if (me.zoomAnimationInProgress) {
+    return;
+  }
+  if (me.getLocks()[me.gestureEvent] === me) {
+    var chart = me.getChart(), surface = me.getSurface(), rect = chart.getInnerRect(), innerPadding = chart.getInnerPadding(), minX = innerPadding.left, maxX = minX + rect[2], minY = innerPadding.top, maxY = minY + rect[3], rectWidth = rect[2], rectHeight = rect[3], xy = chart.getEventXY(e), x = xy[0], y = xy[1];
+    if (x < minX) {
+      x = minX;
+    } else {
+      if (x > maxX) {
+        x = maxX;
+      }
+    }
+    if (y < minY) {
+      y = minY;
+    } else {
+      if (y > maxY) {
+        y = maxY;
+      }
+    }
+    if (Math.abs(me.startX - x) < 11 || Math.abs(me.startY - y) < 11) {
+      surface.remove(me.selectionRect);
+    } else {
+      me.zoomBy([Math.min(me.startX, x) / rectWidth, 1 - Math.max(me.startY, y) / rectHeight, Math.max(me.startX, x) / rectWidth, 1 - Math.min(me.startY, y) / rectHeight]);
+      me.selectionRect.setAttributes({x:Math.min(me.startX, x), y:Math.min(me.startY, y), width:Math.abs(me.startX - x), height:Math.abs(me.startY - y)});
+      me.selectionRect.setAnimation(chart.getAnimation() || {duration:0});
+      me.selectionRect.setAttributes({globalAlpha:0, x:0, y:0, width:rectWidth, height:rectHeight});
+      me.zoomAnimationInProgress = true;
+      chart.suspendThicknessChanged();
+      me.selectionRect.getAnimation().on('animationend', function() {
+        chart.resumeThicknessChanged();
+        surface.remove(me.selectionRect);
+        me.selectionRect = null;
+        me.zoomAnimationInProgress = false;
+      });
+    }
+    surface.renderFrame();
+    me.sync();
+    me.unlockEvents(me.gestureEvent);
+    me.setSeriesOpacity(1);
+    if (!me.zoomAnimationInProgress) {
+      surface.remove(me.selectionRect);
+      me.selectionRect = null;
+    }
+  }
+}, zoomBy:function(rect) {
+  var me = this, axisConfigs = me.getAxes(), chart = me.getChart(), axes = chart.getAxes(), isRtl = chart.getInherited().rtl, config, zoomMap = {}, x1, x2;
+  if (isRtl) {
+    rect = rect.slice();
+    x1 = 1 - rect[0];
+    x2 = 1 - rect[2];
+    rect[0] = Math.min(x1, x2);
+    rect[2] = Math.max(x1, x2);
+  }
+  for (var i = 0; i < axes.length; i++) {
+    var axis = axes[i];
+    config = axisConfigs[axis.getPosition()];
+    if (config && config.allowZoom !== false) {
+      var isSide = axis.isSide(), oldRange = axis.getVisibleRange();
+      zoomMap[axis.getId()] = oldRange.slice(0);
+      if (!isSide) {
+        axis.setVisibleRange([(oldRange[1] - oldRange[0]) * rect[0] + oldRange[0], (oldRange[1] - oldRange[0]) * rect[2] + oldRange[0]]);
+      } else {
+        axis.setVisibleRange([(oldRange[1] - oldRange[0]) * rect[1] + oldRange[0], (oldRange[1] - oldRange[0]) * rect[3] + oldRange[0]]);
+      }
+    }
+  }
+  me.zoomHistory.push(zoomMap);
+  me.getUndoButton().setDisabled(false);
+}, undoZoom:function() {
+  var zoomMap = this.zoomHistory.pop(), axes = this.getChart().getAxes();
+  if (zoomMap) {
+    for (var i = 0; i < axes.length; i++) {
+      var axis = axes[i];
+      if (zoomMap[axis.getId()]) {
+        axis.setVisibleRange(zoomMap[axis.getId()]);
+      }
+    }
+  }
+  this.getUndoButton().setDisabled(this.zoomHistory.length === 0);
+  this.sync();
+}, onDoubleTap:function(e) {
+  this.undoZoom();
+}, destroy:function() {
+  this.setUndoButton(null);
+  this.callParent();
+}});
+Ext.define('Ext.chart.interactions.Crosshair', {extend:Ext.chart.interactions.Abstract, type:'crosshair', alias:'interaction.crosshair', config:{axes:{top:{label:{}, rect:{}}, right:{label:{}, rect:{}}, bottom:{label:{}, rect:{}}, left:{label:{}, rect:{}}}, lines:{horizontal:{strokeStyle:'black', lineDash:[5, 5]}, vertical:{strokeStyle:'black', lineDash:[5, 5]}}, gesture:'drag'}, applyAxes:function(axesConfig, oldAxesConfig) {
+  return Ext.merge(oldAxesConfig || {}, axesConfig);
+}, applyLines:function(linesConfig, oldLinesConfig) {
+  return Ext.merge(oldLinesConfig || {}, linesConfig);
+}, updateChart:function(chart) {
+  if (chart && !chart.isCartesian) {
+    Ext.raise('Crosshair interaction can only be used on cartesian charts.');
+  }
+  this.callParent(arguments);
+}, getGestures:function() {
+  var me = this, gestures = {}, gesture = me.getGesture();
+  gestures[gesture] = 'onGesture';
+  gestures[gesture + 'start'] = 'onGestureStart';
+  gestures[gesture + 'end'] = 'onGestureEnd';
+  gestures[gesture + 'cancel'] = 'onGestureCancel';
+  return gestures;
+}, onGestureStart:function(e) {
+  var me = this, chart = me.getChart(), axesTheme = chart.getTheme().getAxis(), axisTheme, surface = chart.getSurface('overlay'), rect = chart.getInnerRect(), chartWidth = rect[2], chartHeight = rect[3], xy = chart.getEventXY(e), x = xy[0], y = xy[1], axes = chart.getAxes(), axesConfig = me.getAxes(), linesConfig = me.getLines(), axis, axisSurface, axisRect, axisWidth, axisHeight, axisPosition, axisAlignment, axisLabel, axisLabelConfig, crosshairLabelConfig, tickPadding, axisSprite, attr, axisThickness, 
+  lineWidth, halfLineWidth, title, titleBBox, horizontalLineCfg, verticalLineCfg, i;
+  e.claimGesture();
+  if (x > 0 && x < chartWidth && y > 0 && y < chartHeight) {
+    me.lockEvents(me.getGesture());
+    horizontalLineCfg = Ext.apply({xclass:'Ext.chart.grid.HorizontalGrid', x:0, y:y, width:chartWidth}, linesConfig.horizontal);
+    verticalLineCfg = Ext.apply({xclass:'Ext.chart.grid.VerticalGrid', x:x, y:0, height:chartHeight}, linesConfig.vertical);
+    me.axesLabels = me.axesLabels || {};
+    for (i = 0; i < axes.length; i++) {
+      axis = axes[i];
+      axisSurface = axis.getSurface();
+      axisRect = axisSurface.getRect();
+      axisSprite = axis.getSprites()[0];
+      axisWidth = axisRect[2];
+      axisHeight = axisRect[3];
+      axisPosition = axis.getPosition();
+      axisAlignment = axis.getAlignment();
+      title = axis.getTitle();
+      titleBBox = title && title.attr.text !== '' && title.getBBox();
+      attr = axisSprite.attr;
+      axisThickness = axisSprite.thickness;
+      lineWidth = attr.axisLine ? attr.lineWidth : 0;
+      halfLineWidth = lineWidth / 2;
+      tickPadding = Math.max(attr.majorTickSize, attr.minorTickSize) + lineWidth;
+      axisLabel = me.axesLabels[axisPosition] = axisSurface.add({type:'composite'});
+      axisLabel.labelRect = axisLabel.addSprite(Ext.apply({type:'rect', fillStyle:'white', x:axisPosition === 'right' ? lineWidth : 0, y:axisPosition === 'bottom' ? lineWidth : 0, width:axisWidth - lineWidth - (axisAlignment === 'vertical' && titleBBox ? titleBBox.width : 0), height:axisHeight - lineWidth - (axisAlignment === 'horizontal' && titleBBox ? titleBBox.height : 0), translationX:axisPosition === 'left' && titleBBox ? titleBBox.width : 0, translationY:axisPosition === 'top' && titleBBox ? 
+      titleBBox.height : 0}, axesConfig.rect || axesConfig[axisPosition].rect));
+      if (axisAlignment === 'vertical' && !verticalLineCfg.strokeStyle) {
+        verticalLineCfg.strokeStyle = attr.strokeStyle;
+      }
+      if (axisAlignment === 'horizontal' && !horizontalLineCfg.strokeStyle) {
+        horizontalLineCfg.strokeStyle = attr.strokeStyle;
+      }
+      axisTheme = Ext.merge({}, axesTheme.defaults, axesTheme[axisPosition]);
+      axisLabelConfig = Ext.apply({}, axis.config.label, axisTheme.label);
+      crosshairLabelConfig = axesConfig.label || axesConfig[axisPosition].label;
+      axisLabel.labelText = axisLabel.addSprite(Ext.apply(axisLabelConfig, crosshairLabelConfig, {type:'text', x:me.calculateLabelTextPoint(false, axisPosition, tickPadding, titleBBox, axisWidth, halfLineWidth), y:me.calculateLabelTextPoint(true, axisPosition, tickPadding, titleBBox, axisHeight, halfLineWidth)}));
+    }
+    me.horizontalLine = surface.add(horizontalLineCfg);
+    me.verticalLine = surface.add(verticalLineCfg);
+    return false;
+  }
+}, onGesture:function(e) {
+  var me = this;
+  if (me.getLocks()[me.getGesture()] !== me) {
+    return;
+  }
+  var chart = me.getChart(), surface = chart.getSurface('overlay'), rect = Ext.Array.slice(chart.getInnerRect()), padding = chart.getInnerPadding(), px = padding.left, py = padding.top, chartWidth = rect[2], chartHeight = rect[3], xy = chart.getEventXY(e), x = xy[0], y = xy[1], axes = chart.getAxes(), axis, axisPosition, axisAlignment, axisSurface, axisSprite, axisMatrix, axisLayoutContext, axisSegmenter, axisLabel, labelBBox, textPadding, xx, yy, dx, dy, xValue, yValue, text, i;
+  if (x < 0) {
+    x = 0;
+  } else {
+    if (x > chartWidth) {
+      x = chartWidth;
+    }
+  }
+  if (y < 0) {
+    y = 0;
+  } else {
+    if (y > chartHeight) {
+      y = chartHeight;
+    }
+  }
+  x += px;
+  y += py;
+  for (i = 0; i < axes.length; i++) {
+    axis = axes[i];
+    axisPosition = axis.getPosition();
+    axisAlignment = axis.getAlignment();
+    axisSurface = axis.getSurface();
+    axisSprite = axis.getSprites()[0];
+    axisMatrix = axisSprite.attr.matrix;
+    textPadding = axisSprite.attr.textPadding * 2;
+    axisLabel = me.axesLabels[axisPosition];
+    axisLayoutContext = axisSprite.getLayoutContext();
+    axisSegmenter = axis.getSegmenter();
+    if (axisLabel) {
+      if (axisAlignment === 'vertical') {
+        yy = axisMatrix.getYY();
+        dy = axisMatrix.getDY();
+        yValue = (y - dy - py) / yy;
+        if (axis.getLayout() instanceof Ext.chart.axis.layout.Discrete) {
+          y = Math.round(yValue) * yy + dy + py;
+          yValue = axisSegmenter.from(Math.round(yValue));
+          yValue = axisSprite.attr.data[yValue];
+        } else {
+          yValue = axisSegmenter.from(yValue);
+        }
+        text = axisSegmenter.renderer(yValue, axisLayoutContext);
+        axisLabel.setAttributes({translationY:y - py});
+        axisLabel.labelText.setAttributes({text:text});
+        labelBBox = axisLabel.labelText.getBBox();
+        axisLabel.labelRect.setAttributes({height:labelBBox.height + textPadding, y:-(labelBBox.height + textPadding) / 2});
+        axisSurface.renderFrame();
+      } else {
+        xx = axisMatrix.getXX();
+        dx = axisMatrix.getDX();
+        xValue = (x - dx - px) / xx;
+        if (axis.getLayout() instanceof Ext.chart.axis.layout.Discrete) {
+          x = Math.round(xValue) * xx + dx + px;
+          xValue = axisSegmenter.from(Math.round(xValue));
+          xValue = axisSprite.attr.data[xValue];
+        } else {
+          xValue = axisSegmenter.from(xValue);
+        }
+        text = axisSegmenter.renderer(xValue, axisLayoutContext);
+        axisLabel.setAttributes({translationX:x - px});
+        axisLabel.labelText.setAttributes({text:text});
+        labelBBox = axisLabel.labelText.getBBox();
+        axisLabel.labelRect.setAttributes({width:labelBBox.width + textPadding, x:-(labelBBox.width + textPadding) / 2});
+        axisSurface.renderFrame();
+      }
+    }
+  }
+  me.horizontalLine.setAttributes({y:y, strokeStyle:axisSprite.attr.strokeStyle});
+  me.verticalLine.setAttributes({x:x, strokeStyle:axisSprite.attr.strokeStyle});
+  surface.renderFrame();
+  return false;
+}, onGestureEnd:function(e) {
+  var me = this, chart = me.getChart(), surface = chart.getSurface('overlay'), axes = chart.getAxes(), axis, axisPosition, axisSurface, axisLabel, i;
+  surface.remove(me.verticalLine);
+  surface.remove(me.horizontalLine);
+  for (i = 0; i < axes.length; i++) {
+    axis = axes[i];
+    axisPosition = axis.getPosition();
+    axisSurface = axis.getSurface();
+    axisLabel = me.axesLabels[axisPosition];
+    if (axisLabel) {
+      delete me.axesLabels[axisPosition];
+      axisSurface.remove(axisLabel);
+    }
+    axisSurface.renderFrame();
+  }
+  surface.renderFrame();
+  me.unlockEvents(me.getGesture());
+}, onGestureCancel:function(e) {
+  this.onGestureEnd(e);
+}, privates:{vertMap:{top:'start', bottom:'end'}, horzMap:{left:'start', right:'end'}, calculateLabelTextPoint:function(vertical, position, tickPadding, titleBBox, axisSize, halfLineWidth) {
+  var titlePadding, sizeProp, pointProp;
+  if (vertical) {
+    pointProp = 'y';
+    sizeProp = 'height';
+    position = this.vertMap[position];
+  } else {
+    pointProp = 'x';
+    sizeProp = 'width';
+    position = this.horzMap[position];
+  }
+  switch(position) {
+    case 'start':
+      titlePadding = titleBBox ? titleBBox[pointProp] + titleBBox[sizeProp] : 0;
+      return titlePadding + (axisSize - titlePadding - tickPadding) / 2 - halfLineWidth;
+    case 'end':
+      titlePadding = titleBBox ? axisSize - titleBBox[pointProp] : 0;
+      return tickPadding + (axisSize - tickPadding - titlePadding) / 2 + halfLineWidth;
+    default:
+      return 0;
+  }
+}}});
+Ext.define('Ext.chart.interactions.ItemHighlight', {extend:Ext.chart.interactions.Abstract, type:'itemhighlight', alias:'interaction.itemhighlight', isItemHighlight:true, config:{gestures:{tap:'onTapGesture', mousemove:'onMouseMoveGesture', mousedown:'onMouseDownGesture', mouseup:'onMouseUpGesture', mouseleave:'onMouseUpGesture'}, sticky:false, multiTooltips:false}, constructor:function(config) {
+  this.callParent([config]);
+  this.stickyHighlightItem = null;
+  this.tooltipItems = [];
+}, destroy:function() {
+  this.stickyHighlightItem = this.tooltipItems = null;
+  this.callParent();
+}, onMouseMoveGesture:function(e) {
+  var me = this, tooltipItems = me.tooltipItems, isMousePointer = e.pointerType === 'mouse', tooltips = [], item, oldItem, items, tooltip, oldTooltip, i, len, j, jLen;
+  if (me.getSticky()) {
+    return true;
+  }
+  if (isMousePointer && me.stickyHighlightItem) {
+    me.stickyHighlightItem = null;
+    me.highlight(null);
+  }
+  if (me.isDragging) {
+    if (tooltipItems.length && isMousePointer) {
+      me.hideTooltips(tooltipItems);
+      tooltipItems.length = 0;
+    }
+  } else {
+    if (!me.stickyHighlightItem) {
+      if (me.getMultiTooltips()) {
+        items = me.getItemsForEvent(e);
+      } else {
+        item = me.getItemForEvent(e);
+        items = item ? [item] : [];
+      }
+      for (i = 0, len = items.length; i < len; i++) {
+        item = items[i];
+        if (i === 0 && item !== me.getChart().getHighlightItem()) {
+          me.highlight(item);
+          me.sync();
+        }
+        tooltip = item.series.getTooltip();
+        if (tooltip) {
+          tooltips.push(tooltip);
+        }
+      }
+      if (isMousePointer) {
+        if (items.length) {
+          for (i = 0, len = items.length; i < len; i++) {
+            item = items[i];
+            tooltip = item.series.getTooltip();
+            if (tooltip) {
+              for (j = 0, jLen = tooltipItems.length; j < jLen; j++) {
+                oldItem = tooltipItems[j];
+                if (!Ext.Array.contains(items, oldItem)) {
+                  oldTooltip = oldItem.series.getTooltip();
+                  if (!Ext.Array.contains(tooltips, oldTooltip)) {
+                    oldItem.series.hideTooltip(oldItem, true);
+                  }
+                }
+              }
+              if (tooltip.getTrackMouse()) {
+                item.series.showTooltip(item, e);
+              } else {
+                me.showUntracked(item);
+              }
+            }
+          }
+          me.tooltipItems = items;
+        } else {
+          me.hideTooltips(tooltipItems);
+          tooltipItems.length = 0;
+        }
+      }
+      return false;
+    }
+  }
+}, highlight:function(item) {
+  this.getChart().setHighlightItem(item);
+}, showTooltip:function(e, item) {
+  item.series.showTooltip(item, e);
+  Ext.Array.include(this.tooltipItems, item);
+}, showUntracked:function(item) {
+  var marker = item.sprite.getMarker(item.category), surface, surfaceXY, isInverseY, itemBBox, matrix;
+  if (marker) {
+    surface = marker.getSurface();
+    isInverseY = surface.matrix.elements[3] < 0;
+    surfaceXY = surface.element.getXY();
+    itemBBox = Ext.clone(marker.getBBoxFor(item.index));
+    if (isInverseY) {
+      if (surface.getInherited().rtl) {
+        matrix = surface.inverseMatrix.clone().flipX().translate(item.sprite.attr.innerWidth, 0, true);
+      } else {
+        matrix = surface.inverseMatrix;
+      }
+      itemBBox = matrix.transformBBox(itemBBox);
+    }
+    itemBBox.x += surfaceXY[0];
+    itemBBox.y += surfaceXY[1];
+    item.series.showTooltipAt(item, itemBBox.x + itemBBox.width * 0.5, itemBBox.y + itemBBox.height * 0.5);
+  }
+}, onMouseDownGesture:function() {
+  this.isDragging = true;
+}, onMouseUpGesture:function() {
+  this.isDragging = false;
+}, isSameItem:function(a, b) {
+  return a && b && a.series === b.series && a.field === b.field && a.index === b.index;
+}, onTapGesture:function(e) {
+  var me = this;
+  if (e.pointerType === 'mouse' && !me.getSticky()) {
+    return;
+  }
+  var item = me.getItemForEvent(e);
+  if (me.isSameItem(me.stickyHighlightItem, item)) {
+    item = null;
+  }
+  me.stickyHighlightItem = item;
+  me.highlight(item);
+}, privates:{hideTooltips:function(items, force) {
+  var item, i, len;
+  items = Ext.isArray(items) ? items : [items];
+  for (i = 0, len = items.length; i < len; i++) {
+    item = items[i];
+    if (item && item.series && !item.series.destroyed) {
+      item.series.hideTooltip(item, force);
+    }
+  }
+}}});
+Ext.define('Ext.chart.interactions.ItemEdit', {extend:Ext.chart.interactions.ItemHighlight, type:'itemedit', alias:'interaction.itemedit', isItemEdit:true, config:{style:null, renderer:null, tooltip:true, gestures:{dragstart:'onDragStart', drag:'onDrag', dragend:'onDragEnd'}, cursors:{ewResize:'ew-resize', nsResize:'ns-resize', move:'move'}}, item:null, applyTooltip:function(tooltip) {
+  if (tooltip) {
+    var config = Ext.apply({}, tooltip, {renderer:this.defaultTooltipRenderer, constrainPosition:true, shrinkWrapDock:true, autoHide:true, trackMouse:true, mouseOffset:[20, 20]});
+    tooltip = new Ext.tip.ToolTip(config);
+  }
+  return tooltip;
+}, defaultTooltipRenderer:function(tooltip, item, target, e) {
+  var parts = [];
+  if (target.xField) {
+    parts.push(target.xField + ': ' + target.xValue);
+  }
+  if (target.yField) {
+    parts.push(target.yField + ': ' + target.yValue);
+  }
+  tooltip.setHtml(parts.join('\x3cbr\x3e'));
+}, onDragStart:function(e) {
+  var me = this, chart = me.getChart(), item = chart.getHighlightItem();
+  e.claimGesture();
+  if (item) {
+    chart.fireEvent('beginitemedit', chart, me, me.item = item);
+    return false;
+  }
+}, onDrag:function(e) {
+  var me = this, chart = me.getChart(), item = chart.getHighlightItem(), type = item && item.sprite.type;
+  if (item) {
+    switch(type) {
+      case 'barSeries':
+        return me.onDragBar(e);
+      case 'scatterSeries':
+        return me.onDragScatter(e);
+    }
+  }
+}, highlight:function(item) {
+  var me = this, chart = me.getChart(), flipXY = chart.getFlipXY(), cursors = me.getCursors(), type = item && item.sprite.type, style = chart.el.dom.style;
+  me.callParent([item]);
+  if (item) {
+    switch(type) {
+      case 'barSeries':
+        if (flipXY) {
+          style.cursor = cursors.ewResize;
+        } else {
+          style.cursor = cursors.nsResize;
+        }
+        break;
+      case 'scatterSeries':
+        style.cursor = cursors.move;
+        break;
+    }
+  } else {
+    chart.el.dom.style.cursor = 'default';
+  }
+}, onDragBar:function(e) {
+  var me = this, chart = me.getChart(), isRtl = chart.getInherited().rtl, flipXY = chart.isCartesian && chart.getFlipXY(), item = chart.getHighlightItem(), marker = item.sprite.getMarker('items'), instance = marker.getMarkerFor(item.sprite.getId(), item.index), surface = item.sprite.getSurface(), surfaceRect = surface.getRect(), xy = surface.getEventXY(e), matrix = item.sprite.attr.matrix, renderer = me.getRenderer(), style, changes, params, positionY;
+  if (flipXY) {
+    positionY = isRtl ? surfaceRect[2] - xy[0] : xy[0];
+  } else {
+    positionY = surfaceRect[3] - xy[1];
+  }
+  style = {x:instance.x, y:positionY, width:instance.width, height:instance.height + (instance.y - positionY), radius:instance.radius, fillStyle:'none', lineDash:[4, 4], zIndex:100};
+  Ext.apply(style, me.getStyle());
+  if (Ext.isArray(item.series.getYField())) {
+    positionY = positionY - instance.y - instance.height;
+  }
+  me.target = {index:item.index, yField:item.field, yValue:(positionY - matrix.getDY()) / matrix.getYY()};
+  params = [chart, {target:me.target, style:style, item:item}];
+  changes = Ext.callback(renderer, null, params, 0, chart);
+  if (changes) {
+    Ext.apply(style, changes);
+  }
+  item.sprite.putMarker('items', style, 'itemedit');
+  me.showTooltip(e, me.target, item);
+  surface.renderFrame();
+}, onDragScatter:function(e) {
+  var me = this, chart = me.getChart(), isRtl = chart.getInherited().rtl, flipXY = chart.isCartesian && chart.getFlipXY(), item = chart.getHighlightItem(), marker = item.sprite.getMarker('markers'), instance = marker.getMarkerFor(item.sprite.getId(), item.index), surface = item.sprite.getSurface(), surfaceRect = surface.getRect(), xy = surface.getEventXY(e), matrix = item.sprite.attr.matrix, xAxis = item.series.getXAxis(), isEditableX = xAxis && xAxis.getLayout().isContinuous, renderer = me.getRenderer(), 
+  style, changes, params, positionX, positionY, hintX, hintY;
+  if (flipXY) {
+    positionY = isRtl ? surfaceRect[2] - xy[0] : xy[0];
+  } else {
+    positionY = surfaceRect[3] - xy[1];
+  }
+  if (isEditableX) {
+    if (flipXY) {
+      positionX = surfaceRect[3] - xy[1];
+    } else {
+      positionX = xy[0];
+    }
+  } else {
+    positionX = instance.translationX;
+  }
+  if (isEditableX) {
+    hintX = xy[0];
+    hintY = xy[1];
+  } else {
+    if (flipXY) {
+      hintX = xy[0];
+      hintY = instance.translationY;
+    } else {
+      hintX = instance.translationX;
+      hintY = xy[1];
+    }
+  }
+  style = {translationX:hintX, translationY:hintY, scalingX:instance.scalingX, scalingY:instance.scalingY, r:instance.r, fillStyle:'none', lineDash:[4, 4], zIndex:100};
+  Ext.apply(style, me.getStyle());
+  me.target = {index:item.index, yField:item.field, yValue:(positionY - matrix.getDY()) / matrix.getYY()};
+  if (isEditableX) {
+    Ext.apply(me.target, {xField:item.series.getXField(), xValue:(positionX - matrix.getDX()) / matrix.getXX()});
+  }
+  params = [chart, {target:me.target, style:style, item:item}];
+  changes = Ext.callback(renderer, null, params, 0, chart);
+  if (changes) {
+    Ext.apply(style, changes);
+  }
+  item.sprite.putMarker('markers', style, 'itemedit');
+  me.showTooltip(e, me.target, item);
+  surface.renderFrame();
+}, showTooltip:function(e, target, item) {
+  var tooltip = this.getTooltip(), config, chart;
+  if (tooltip && Ext.toolkit !== 'modern') {
+    config = tooltip.config;
+    chart = this.getChart();
+    Ext.callback(config.renderer, null, [tooltip, item, target, e], 0, chart);
+    tooltip.pointerEvent = e;
+    if (tooltip.isVisible()) {
+      tooltip.realignToTarget();
+    } else {
+      tooltip.show();
+    }
+  }
+}, hideTooltip:function() {
+  var tooltip = this.getTooltip();
+  if (tooltip && Ext.toolkit !== 'modern') {
+    tooltip.hide();
+  }
+}, onDragEnd:function(e) {
+  var me = this, target = me.target, chart = me.getChart(), store = chart.getStore(), record;
+  if (target) {
+    record = store.getAt(target.index);
+    if (target.yField) {
+      record.set(target.yField, target.yValue, {convert:false});
+    }
+    if (target.xField) {
+      record.set(target.xField, target.xValue, {convert:false});
+    }
+    if (target.yField || target.xField) {
+      me.getChart().onDataChanged();
+    }
+    me.target = null;
+  }
+  me.hideTooltip();
+  if (me.item) {
+    chart.fireEvent('enditemedit', chart, me, me.item, target);
+  }
+  me.highlight(me.item = null);
+}, destroy:function() {
+  var tooltip = this.getConfig('tooltip', true);
+  Ext.destroy(tooltip);
+  this.callParent();
+}});
+Ext.define('Ext.chart.interactions.PanZoom', {extend:Ext.chart.interactions.Abstract, type:'panzoom', alias:'interaction.panzoom', config:{axes:{top:{}, right:{}, bottom:{}, left:{}}, minZoom:null, maxZoom:null, showOverflowArrows:true, panGesture:'drag', zoomGesture:'pinch', zoomOnPanGesture:null, zoomOnPan:false, doubleTapReset:false, modeToggleButton:{xtype:'segmentedbutton', width:200, defaults:{ui:'default-toolbar'}, cls:Ext.baseCSSPrefix + 'panzoom-toggle', items:[{text:'Pan', value:'pan'}, 
+{text:'Zoom', value:'zoom'}]}, hideLabelInGesture:false}, stopAnimationBeforeSync:true, applyAxes:function(axesConfig, oldAxesConfig) {
+  return Ext.merge(oldAxesConfig || {}, axesConfig);
+}, updateZoomOnPan:function(zoomOnPan) {
+  var button = this.getModeToggleButton();
+  button.setValue(zoomOnPan ? 'zoom' : 'pan');
+}, updateZoomOnPanGesture:function(zoomOnPanGesture) {
+  this.setZoomOnPan(zoomOnPanGesture);
+}, getZoomOnPanGesture:function() {
+  return this.getZoomOnPan();
+}, applyModeToggleButton:function(button, oldButton) {
+  return Ext.factory(button, 'Ext.button.Segmented', oldButton);
+}, updateModeToggleButton:function(button) {
+  if (button) {
+    button.on('change', 'onModeToggleChange', this);
+  }
+}, onModeToggleChange:function(segmentedButton, value) {
+  this.setZoomOnPan(value === 'zoom');
+}, getGestures:function() {
+  var me = this, gestures = {}, pan = me.getPanGesture(), zoom = me.getZoomGesture();
+  gestures[zoom] = 'onZoomGestureMove';
+  gestures[zoom + 'start'] = 'onZoomGestureStart';
+  gestures[zoom + 'end'] = 'onZoomGestureEnd';
+  gestures[pan] = 'onPanGestureMove';
+  gestures[pan + 'start'] = 'onPanGestureStart';
+  gestures[pan + 'end'] = 'onPanGestureEnd';
+  gestures.doubletap = 'onDoubleTap';
+  return gestures;
+}, onDoubleTap:function(e) {
+  var me = this, doubleTapReset = me.getDoubleTapReset(), chart, axes, axis, i, ln;
+  if (doubleTapReset) {
+    chart = me.getChart();
+    axes = chart.getAxes();
+    for (i = 0, ln = axes.length; i < ln; i++) {
+      axis = axes[i];
+      axis.setVisibleRange([0, 1]);
+    }
+    chart.redraw();
+  }
+}, onPanGestureStart:function(e) {
+  if (!e || !e.touches || e.touches.length < 2) {
+    var me = this, chart = me.getChart(), rect = chart.getInnerRect(), xy = chart.element.getXY();
+    e.claimGesture();
+    chart.suspendAnimation();
+    me.startX = e.getX() - xy[0] - rect[0];
+    me.startY = e.getY() - xy[1] - rect[1];
+    me.oldVisibleRanges = null;
+    me.hideLabels();
+    chart.suspendThicknessChanged();
+    me.lockEvents(me.getPanGesture());
+    return false;
+  }
+}, onPanGestureMove:function(e) {
+  var me = this, isMouse = e.pointerType === 'mouse', isZoomOnPan = isMouse && me.getZoomOnPan();
+  if (me.getLocks()[me.getPanGesture()] === me) {
+    var chart = me.getChart(), rect = chart.getInnerRect(), xy = chart.element.getXY();
+    if (isZoomOnPan) {
+      me.transformAxesBy(me.getZoomableAxes(e), 0, 0, (e.getX() - xy[0] - rect[0]) / me.startX, me.startY / (e.getY() - xy[1] - rect[1]));
+    } else {
+      me.transformAxesBy(me.getPannableAxes(e), e.getX() - xy[0] - rect[0] - me.startX, e.getY() - xy[1] - rect[1] - me.startY, 1, 1);
+    }
+    me.sync();
+    return false;
+  }
+}, onPanGestureEnd:function(e) {
+  var me = this, pan = me.getPanGesture(), chart;
+  if (me.getLocks()[pan] === me) {
+    chart = me.getChart();
+    chart.resumeThicknessChanged();
+    me.showLabels();
+    me.sync();
+    me.unlockEvents(pan);
+    chart.resumeAnimation();
+    return false;
+  }
+}, onZoomGestureStart:function(e) {
+  if (e.touches && e.touches.length === 2) {
+    var me = this, chart = me.getChart(), xy = chart.element.getXY(), rect = chart.getInnerRect(), x = xy[0] + rect[0], y = xy[1] + rect[1], newPoints = [e.touches[0].point.x - x, e.touches[0].point.y - y, e.touches[1].point.x - x, e.touches[1].point.y - y], xDistance = Math.max(44, Math.abs(newPoints[2] - newPoints[0])), yDistance = Math.max(44, Math.abs(newPoints[3] - newPoints[1]));
+    e.claimGesture();
+    chart.suspendAnimation();
+    chart.suspendThicknessChanged();
+    me.lastZoomDistances = [xDistance, yDistance];
+    me.lastPoints = newPoints;
+    me.oldVisibleRanges = null;
+    me.hideLabels();
+    me.lockEvents(me.getZoomGesture());
+    return false;
+  }
+}, onZoomGestureMove:function(e) {
+  var me = this;
+  if (me.getLocks()[me.getZoomGesture()] === me) {
+    var chart = me.getChart(), rect = chart.getInnerRect(), xy = chart.element.getXY(), x = xy[0] + rect[0], y = xy[1] + rect[1], abs = Math.abs, lastPoints = me.lastPoints, newPoints = [e.touches[0].point.x - x, e.touches[0].point.y - y, e.touches[1].point.x - x, e.touches[1].point.y - y], xDistance = Math.max(44, abs(newPoints[2] - newPoints[0])), yDistance = Math.max(44, abs(newPoints[3] - newPoints[1])), lastDistances = this.lastZoomDistances || [xDistance, yDistance], zoomX = xDistance / lastDistances[0], 
+    zoomY = yDistance / lastDistances[1];
+    me.transformAxesBy(me.getZoomableAxes(e), rect[2] * (zoomX - 1) / 2 + newPoints[2] - lastPoints[2] * zoomX, rect[3] * (zoomY - 1) / 2 + newPoints[3] - lastPoints[3] * zoomY, zoomX, zoomY);
+    me.sync();
+    return false;
+  }
+}, onZoomGestureEnd:function(e) {
+  var me = this, zoom = me.getZoomGesture(), chart;
+  if (me.getLocks()[zoom] === me) {
+    chart = me.getChart();
+    chart.resumeThicknessChanged();
+    me.showLabels();
+    me.sync();
+    me.unlockEvents(zoom);
+    chart.resumeAnimation();
+    return false;
+  }
+}, hideLabels:function() {
+  if (this.getHideLabelInGesture()) {
+    this.eachInteractiveAxes(function(axis) {
+      axis.hideLabels();
+    });
+  }
+}, showLabels:function() {
+  if (this.getHideLabelInGesture()) {
+    this.eachInteractiveAxes(function(axis) {
+      axis.showLabels();
+    });
+  }
+}, isEventOnAxis:function(e, axis) {
+  var rect = axis.getSurface().getRect();
+  return rect[0] <= e.getX() && e.getX() <= rect[0] + rect[2] && rect[1] <= e.getY() && e.getY() <= rect[1] + rect[3];
+}, getPannableAxes:function(e) {
+  var me = this, axisConfigs = me.getAxes(), axes = me.getChart().getAxes(), i, ln = axes.length, result = [], isEventOnAxis = false, config;
+  if (e) {
+    for (i = 0; i < ln; i++) {
+      if (this.isEventOnAxis(e, axes[i])) {
+        isEventOnAxis = true;
+        break;
+      }
+    }
+  }
+  for (i = 0; i < ln; i++) {
+    config = axisConfigs[axes[i].getPosition()];
+    if (config && config.allowPan !== false && (!isEventOnAxis || this.isEventOnAxis(e, axes[i]))) {
+      result.push(axes[i]);
+    }
+  }
+  return result;
+}, getZoomableAxes:function(e) {
+  var me = this, axisConfigs = me.getAxes(), axes = me.getChart().getAxes(), result = [], i, ln = axes.length, axis, isEventOnAxis = false, config;
+  if (e) {
+    for (i = 0; i < ln; i++) {
+      if (this.isEventOnAxis(e, axes[i])) {
+        isEventOnAxis = true;
+        break;
+      }
+    }
+  }
+  for (i = 0; i < ln; i++) {
+    axis = axes[i];
+    config = axisConfigs[axis.getPosition()];
+    if (config && config.allowZoom !== false && (!isEventOnAxis || this.isEventOnAxis(e, axis))) {
+      result.push(axis);
+    }
+  }
+  return result;
+}, eachInteractiveAxes:function(fn) {
+  var me = this, axisConfigs = me.getAxes(), axes = me.getChart().getAxes();
+  for (var i = 0; i < axes.length; i++) {
+    if (axisConfigs[axes[i].getPosition()]) {
+      if (false === fn.call(this, axes[i])) {
+        return;
+      }
+    }
+  }
+}, transformAxesBy:function(axes, panX, panY, sx, sy) {
+  var rect = this.getChart().getInnerRect(), axesCfg = this.getAxes(), axisCfg, oldVisibleRanges = this.oldVisibleRanges, result = false;
+  if (!oldVisibleRanges) {
+    this.oldVisibleRanges = oldVisibleRanges = {};
+    this.eachInteractiveAxes(function(axis) {
+      oldVisibleRanges[axis.getId()] = axis.getVisibleRange();
+    });
+  }
+  if (!rect) {
+    return;
+  }
+  for (var i = 0; i < axes.length; i++) {
+    axisCfg = axesCfg[axes[i].getPosition()];
+    result = this.transformAxisBy(axes[i], oldVisibleRanges[axes[i].getId()], panX, panY, sx, sy, this.minZoom || axisCfg.minZoom, this.maxZoom || axisCfg.maxZoom) || result;
+  }
+  return result;
+}, transformAxisBy:function(axis, oldVisibleRange, panX, panY, sx, sy, minZoom, maxZoom) {
+  var me = this, visibleLength = oldVisibleRange[1] - oldVisibleRange[0], visibleRange = axis.getVisibleRange(), actualMinZoom = minZoom || me.getMinZoom() || axis.config.minZoom, actualMaxZoom = maxZoom || me.getMaxZoom() || axis.config.maxZoom, rect = me.getChart().getInnerRect(), left, right;
+  if (!rect) {
+    return;
+  }
+  var isSide = axis.isSide(), length = isSide ? rect[3] : rect[2], pan = isSide ? -panY : panX;
+  visibleLength /= isSide ? sy : sx;
+  if (visibleLength < 0) {
+    visibleLength = -visibleLength;
+  }
+  if (visibleLength * actualMinZoom > 1) {
+    visibleLength = 1;
+  }
+  if (visibleLength * actualMaxZoom < 1) {
+    visibleLength = 1 / actualMaxZoom;
+  }
+  left = oldVisibleRange[0];
+  right = oldVisibleRange[1];
+  visibleRange = visibleRange[1] - visibleRange[0];
+  if (visibleLength === visibleRange && visibleRange === 1) {
+    return;
+  }
+  axis.setVisibleRange([(oldVisibleRange[0] + oldVisibleRange[1] - visibleLength) * 0.5 - pan / length * visibleLength, (oldVisibleRange[0] + oldVisibleRange[1] + visibleLength) * 0.5 - pan / length * visibleLength]);
+  return Math.abs(left - axis.getVisibleRange()[0]) > 1.0E-10 || Math.abs(right - axis.getVisibleRange()[1]) > 1.0E-10;
+}, destroy:function() {
+  this.setModeToggleButton(null);
+  this.callParent();
+}});
 Ext.define('Ext.chart.interactions.Rotate', {extend:Ext.chart.interactions.Abstract, type:'rotate', alternateClassName:'Ext.chart.interactions.RotatePie3D', alias:['interaction.rotate', 'interaction.rotatePie3d'], config:{gesture:'rotate', gestures:{dragstart:'onGestureStart', drag:'onGesture', dragend:'onGestureEnd'}, rotation:0}, oldRotations:null, getAngle:function(e) {
   var me = this, chart = me.getChart(), xy = chart.getEventXY(e), center = chart.getCenter();
   return Math.atan2(xy[1] - center[1], xy[0] - center[0]);
@@ -98944,6 +100784,1710 @@ Ext.define('Ext.chart.interactions.Rotate', {extend:Ext.chart.interactions.Abstr
     return false;
   }
 }});
+Ext.define('Ext.chart.navigator.ContainerBase', {extend:Ext.panel.Panel});
+Ext.define('Ext.chart.navigator.NavigatorBase', {extend:Ext.chart.CartesianChart, onRender:function() {
+  this.callParent();
+  this.setupEvents();
+}, setDocked:function(docked) {
+  var me = this, ownerCt = me.getNavigatorContainer();
+  if (!(docked === 'top' || docked === 'bottom')) {
+    Ext.raise("Can only dock to 'top' or 'bottom'.");
+  }
+  if (docked !== me.dock) {
+    if (ownerCt && ownerCt.moveDocked) {
+      ownerCt.moveDocked(me, docked);
+    } else {
+      me.dock = docked;
+    }
+  }
+  return me;
+}, getDocked:function() {
+  return this.dock;
+}});
+Ext.define('Ext.chart.navigator.sprite.RangeMask', {extend:Ext.draw.sprite.Sprite, alias:'sprite.rangemask', inheritableStatics:{def:{processors:{min:'limited01', max:'limited01', thumbOpacity:'limited01'}, defaults:{min:0, max:1, lineWidth:2, miterLimit:1, strokeStyle:'#787878', thumbOpacity:1}}}, getBBox:function(isWithoutTransform) {
+  var me = this, attr = me.attr, bbox = attr.bbox;
+  bbox.plain = {x:0, y:0, width:1, height:1};
+  if (isWithoutTransform) {
+    return bbox.plain;
+  }
+  return bbox.transform || (bbox.transform = attr.matrix.transformBBox(bbox.plain));
+}, renderThumb:function(surface, ctx, x, y) {
+  var me = this, shapeSprite = me.shapeSprite, textureSprite = me.textureSprite, thumbOpacity = me.attr.thumbOpacity, thumbAttributes = {opacity:thumbOpacity, translationX:x, translationY:y};
+  if (!shapeSprite) {
+    shapeSprite = me.shapeSprite = new Ext.draw.sprite.Rect({x:-9.5, y:-9.5, width:19, height:19, radius:4, lineWidth:1, fillStyle:{type:'linear', degrees:90, stops:[{offset:0, color:'#EEE'}, {offset:1, color:'#FFF'}]}, strokeStyle:'#999'});
+    textureSprite = me.textureSprite = new Ext.draw.sprite.Path({path:'M -4, -5, -4, 5 M 0, -5, 0, 5 M 4, -5, 4, 5', strokeStyle:{type:'linear', degrees:90, stops:[{offset:0, color:'#CCC'}, {offset:1, color:'#BBB'}]}, lineWidth:2});
+  }
+  ctx.save();
+  shapeSprite.setAttributes(thumbAttributes);
+  shapeSprite.applyTransformations();
+  textureSprite.setAttributes(thumbAttributes);
+  textureSprite.applyTransformations();
+  shapeSprite.useAttributes(ctx);
+  shapeSprite.render(surface, ctx);
+  textureSprite.useAttributes(ctx);
+  textureSprite.render(surface, ctx);
+  ctx.restore();
+}, render:function(surface, ctx) {
+  var me = this, attr = me.attr, matrix = attr.matrix.elements, sx = matrix[0], sy = matrix[3], tx = matrix[4], ty = matrix[5], min = attr.min, max = attr.max, s_min = min * sx + tx, s_max = max * sx + tx, s_y = Math.round(0.5 * sy + ty);
+  ctx.beginPath();
+  ctx.moveTo(tx, ty);
+  ctx.lineTo(sx + tx, ty);
+  ctx.lineTo(sx + tx, sy + ty);
+  ctx.lineTo(tx, sy + ty);
+  ctx.lineTo(tx, ty);
+  ctx.moveTo(s_min, ty);
+  ctx.lineTo(s_min, sy + ty);
+  ctx.lineTo(s_max, sy + ty);
+  ctx.lineTo(s_max, ty);
+  ctx.lineTo(s_min, ty);
+  ctx.fillStroke(attr, true);
+  me.renderThumb(surface, ctx, Math.round(s_min), s_y);
+  me.renderThumb(surface, ctx, Math.round(s_max), s_y);
+}});
+Ext.define('Ext.chart.navigator.Navigator', {extend:Ext.chart.navigator.NavigatorBase, isNavigator:true, config:{docked:'bottom', span:'series', insetPadding:0, innerPadding:0, navigatorContainer:null, axis:null, tolerance:20, minimum:0.8, maximum:1, thumbGap:30, autoHideThumbs:true, width:'100%', height:75}, dragType:null, constructor:function(config) {
+  config = config || {};
+  var me = this, visibleRange = [config.minimum || 0.8, config.maximum || 1], overlay;
+  me.callParent([config]);
+  overlay = me.overlaySurface;
+  overlay.element.setStyle({zIndex:100});
+  me.rangeMask = overlay.add({type:'rangemask', min:visibleRange[0], max:visibleRange[1], fillStyle:'rgba(0, 0, 0, .25)'});
+  me.onDragEnd();
+  me.rangeMask.setAnimation({duration:500, customDurations:{min:0, max:0, translationX:0, translationY:0, scalingX:0, scalingY:0, scalingCenterX:0, scalingCenterY:0, fillStyle:0, strokeStyle:0}});
+  me.setVisibleRange(visibleRange);
+}, createSurface:function(id) {
+  var surface = this.callParent([id]);
+  if (id === 'overlay') {
+    this.overlaySurface = surface;
+  }
+  return surface;
+}, applyAxis:function(axis) {
+  return this.getNavigatorContainer().getChart().getAxis(axis);
+}, updateAxis:function(axis, oldAxis) {
+  var me = this, eventName = 'visiblerangechange', eventHandler = 'onAxisVisibleRangeChange';
+  if (oldAxis) {
+    oldAxis.un(eventName, eventHandler, me);
+  }
+  if (axis) {
+    axis.on(eventName, eventHandler, me);
+  }
+  me.axis = axis;
+}, getAxis:function() {
+  return this.axis;
+}, onAxisVisibleRangeChange:function(axis, visibleRange) {
+  this.setVisibleRange(visibleRange);
+}, updateNavigatorContainer:function(navigatorContainer) {
+  var me = this, oldChart = me.chart, chart = me.chart = navigatorContainer && navigatorContainer.getChart(), chartSeriesList = chart && chart.getSeries(), chartLegendStore = me.chartLegendStore, navigatorSeriesList = [], storeEventName = 'update', storeEventHandler = 'onChartLegendStoreUpdate', chartSeries, navigatorSeries, seriesConfig, i;
+  if (oldChart) {
+    oldChart.un('layout', 'afterBoundChartLayout', me);
+    oldChart.un('themechange', 'onChartThemeChange', me);
+    oldChart.un('storechange', 'onChartStoreChange', me);
+  }
+  chart.on('layout', 'afterBoundChartLayout', me);
+  for (i = 0; i < chartSeriesList.length; i++) {
+    chartSeries = chartSeriesList[i];
+    seriesConfig = me.getSeriesConfig(chartSeries);
+    navigatorSeries = Ext.create('series.' + seriesConfig.type, seriesConfig);
+    navigatorSeries.parentSeries = chartSeries;
+    chartSeries.navigatorSeries = navigatorSeries;
+    navigatorSeriesList.push(navigatorSeries);
+  }
+  if (chartLegendStore) {
+    chartLegendStore.un(storeEventName, storeEventHandler, me);
+    me.chartLegendStore = null;
+  }
+  if (chart) {
+    me.setStore(chart.getStore());
+    me.chartLegendStore = chartLegendStore = chart.getLegendStore();
+    if (chartLegendStore) {
+      chartLegendStore.on(storeEventName, storeEventHandler, me);
+    }
+    chart.on('themechange', 'onChartThemeChange', me);
+    chart.on('storechange', 'onChartStoreChange', me);
+    me.onChartThemeChange(chart, chart.getTheme());
+  }
+  me.setSeries(navigatorSeriesList);
+}, onChartThemeChange:function(chart, theme) {
+  this.setTheme(theme);
+}, onChartStoreChange:function(chart, store) {
+  this.setStore(store);
+}, addCustomStyle:function(config, style, subStyle) {
+  var fillStyle, strokeStyle;
+  style = style || {};
+  subStyle = subStyle || {};
+  config.style = config.style || {};
+  config.subStyle = config.subStyle || {};
+  fillStyle = style && (style.fillStyle || style.fill);
+  strokeStyle = style && (style.strokeStyle || style.stroke);
+  if (fillStyle) {
+    config.style.fillStyle = fillStyle;
+  }
+  if (strokeStyle) {
+    config.style.strokeStyle = strokeStyle;
+  }
+  fillStyle = subStyle && (subStyle.fillStyle || subStyle.fill);
+  strokeStyle = subStyle && (subStyle.strokeStyle || subStyle.stroke);
+  if (fillStyle) {
+    config.subStyle.fillStyle = fillStyle;
+  }
+  if (strokeStyle) {
+    config.subStyle.strokeStyle = strokeStyle;
+  }
+  return config;
+}, getSeriesConfig:function(chartSeries) {
+  var me = this, style = chartSeries.getStyle(), config;
+  if (chartSeries.isLine) {
+    config = me.addCustomStyle({type:'line', fill:true, xField:chartSeries.getXField(), yField:chartSeries.getYField(), smooth:chartSeries.getSmooth()}, style);
+  } else {
+    if (chartSeries.isCandleStick) {
+      config = me.addCustomStyle({type:'line', fill:true, xField:chartSeries.getXField(), yField:chartSeries.getCloseField()}, style.raiseStyle);
+    } else {
+      if (chartSeries.isArea || chartSeries.isBar) {
+        config = me.addCustomStyle({type:'area', xField:chartSeries.getXField(), yField:chartSeries.getYField()}, style, chartSeries.getSubStyle());
+      } else {
+        Ext.raise("Navigator only works with 'line', 'bar', 'candlestick' and 'area' series.");
+      }
+    }
+  }
+  config.style.fillOpacity = 0.2;
+  return config;
+}, onChartLegendStoreUpdate:function(store, record) {
+  var me = this, chart = me.chart, series;
+  if (chart && record) {
+    series = chart.getSeries().map[record.get('series')];
+    if (series && series.navigatorSeries) {
+      series.navigatorSeries.setHiddenByIndex(record.get('index'), record.get('disabled'));
+      me.redraw();
+    }
+  }
+}, setupEvents:function() {
+  var me = this, overlayEl = me.overlaySurface.element;
+  overlayEl.on({scope:me, drag:'onDrag', dragstart:'onDragStart', dragend:'onDragEnd', dragcancel:'onDragEnd', mousemove:'onMouseMove'});
+}, onMouseMove:function(e) {
+  var me = this, overlayEl = me.overlaySurface.element, style = overlayEl.dom.style, dragType = me.getDragType(e.pageX - overlayEl.getXY()[0]);
+  switch(dragType) {
+    case 'min':
+    case 'max':
+      style.cursor = 'ew-resize';
+      break;
+    case 'pan':
+      style.cursor = 'move';
+      break;
+    default:
+      style.cursor = 'default';
+  }
+}, getDragType:function(x) {
+  var me = this, t = me.getTolerance(), width = me.overlaySurface.element.getSize().width, rangeMask = me.rangeMask, min = width * rangeMask.attr.min, max = width * rangeMask.attr.max, dragType;
+  if (x > min + t && x < max - t) {
+    dragType = 'pan';
+  } else {
+    if (x <= min + t && x > min - t) {
+      dragType = 'min';
+    } else {
+      if (x >= max - t && x < max + t) {
+        dragType = 'max';
+      }
+    }
+  }
+  return dragType;
+}, onDragStart:function(e) {
+  if (this.dragType || e && e.touches && e.touches.length > 1) {
+    return;
+  }
+  var me = this, x = e.touches[0].pageX - me.overlaySurface.element.getXY()[0], dragType = me.getDragType(x);
+  me.rangeMask.attr.thumbOpacity = 1;
+  if (dragType) {
+    me.dragType = dragType;
+    me.touchId = e.touches[0].identifier;
+    me.dragX = x;
+  }
+}, onDrag:function(e) {
+  if (e.touch.identifier !== this.touchId) {
+    return;
+  }
+  var me = this, overlayEl = me.overlaySurface.element, width = overlayEl.getSize().width, x = e.touches[0].pageX - overlayEl.getXY()[0], thumbGap = me.getThumbGap() / width, rangeMask = me.rangeMask, min = rangeMask.attr.min, max = rangeMask.attr.max, delta = max - min, dragType = me.dragType, drag = me.dragX, dx = (x - drag) / width;
+  if (dragType === 'pan') {
+    min += dx;
+    max += dx;
+    if (min < 0) {
+      min = 0;
+      max = delta;
+    }
+    if (max > 1) {
+      max = 1;
+      min = max - delta;
+    }
+  } else {
+    if (dragType === 'min') {
+      min += dx;
+      if (min < 0) {
+        min = 0;
+      }
+      if (min > max - thumbGap) {
+        min = max - thumbGap;
+      }
+    } else {
+      if (dragType === 'max') {
+        max += dx;
+        if (max > 1) {
+          max = 1;
+        }
+        if (max < min + thumbGap) {
+          max = min + thumbGap;
+        }
+      } else {
+        return;
+      }
+    }
+  }
+  me.dragX = x;
+  me.setVisibleRange([min, max]);
+}, onDragEnd:function() {
+  var me = this, autoHideThumbs = me.getAutoHideThumbs();
+  me.dragType = null;
+  if (autoHideThumbs) {
+    me.rangeMask.setAttributes({thumbOpacity:0});
+  }
+}, updateMinimum:function(mininum) {
+  if (!this.isConfiguring) {
+    this.setVisibleRange([mininum, this.getMaximum()]);
+  }
+}, updateMaximum:function(maximum) {
+  if (!this.isConfiguring) {
+    this.setVisibleRange([this.getMinimum(), maximum]);
+  }
+}, getMinimum:function() {
+  return this.rangeMask.attr.min;
+}, getMaximum:function() {
+  return this.rangeMask.attr.max;
+}, setVisibleRange:function(visibleRange) {
+  var me = this, chart = me.chart;
+  me.axis.setVisibleRange(visibleRange);
+  me.rangeMask.setAttributes({min:visibleRange[0], max:visibleRange[1]});
+  me.getSurface('overlay').renderFrame();
+  chart.suspendAnimation();
+  chart.redraw();
+  chart.resumeAnimation();
+}, afterBoundChartLayout:function() {
+  var me = this, spanSeries = me.getSpan() === 'series', mainRect = me.chart.getMainRect(), size = me.element.getSize();
+  if (mainRect && spanSeries) {
+    me.setInsetPadding({left:mainRect[0], right:size.width - mainRect[2] - mainRect[0], top:0, bottom:0});
+    me.performLayout();
+  }
+}, afterChartLayout:function() {
+  var me = this, size = me.overlaySurface.element.getSize();
+  me.rangeMask.setAttributes({scalingCenterX:0, scalingCenterY:0, scalingX:size.width, scalingY:size.height});
+}, doDestroy:function() {
+  var chart = this.chart;
+  if (chart && !chart.destroyed) {
+    chart.un('layout', 'afterBoundChartLayout', this);
+  }
+  this.callParent();
+}});
+Ext.define('Ext.chart.navigator.Container', {extend:Ext.chart.navigator.ContainerBase, xtype:'chartnavigator', config:{chart:null, navigator:{}}, layout:'fit', applyChart:function(chart, oldChart) {
+  if (oldChart) {
+    oldChart.destroy();
+  }
+  if (chart) {
+    if (chart.isCartesian) {
+      Ext.raise('Only cartesian charts are supported.');
+    }
+    if (!chart.isChart) {
+      chart.$initParent = this;
+      chart = new Ext.chart.CartesianChart(chart);
+      delete chart.$initParent;
+    }
+  }
+  return chart;
+}, legendStore:null, surfaceRects:null, updateChart:function(chart, oldChart) {
+  var me = this;
+  if (chart) {
+    me.legendStore = chart.getLegendStore();
+    if (!me.items && me.initItems) {
+      me.initItems();
+    }
+    me.add(chart);
+  }
+}, applyNavigator:function(navigator, oldNavigator) {
+  var instance;
+  if (oldNavigator) {
+    oldNavigator.destroy();
+  }
+  if (navigator) {
+    navigator.navigatorContainer = navigator.parent = this;
+    instance = new Ext.chart.navigator.Navigator(navigator);
+  }
+  return instance;
+}, preview:function() {
+  this.getNavigator().preview(this.getImage());
+}, download:function(config) {
+  config = config || {};
+  config.data = this.getImage().data;
+  this.getNavigator().download(config);
+}, setVisibleRange:function(visibleRange) {
+  this.getNavigator().setVisibleRange(visibleRange);
+}, getImage:function(format) {
+  var me = this, chart = me.getChart(), navigator = me.getNavigator(), docked = navigator.getDocked(), chartImageSize = chart.bodyElement.getSize(), navigatorImageSize = navigator.bodyElement.getSize(), chartSurfaces = chart.getSurfaces(true), navigatorSurfaces = navigator.getSurfaces(true), size = {width:chartImageSize.width, height:chartImageSize.height + navigatorImageSize.height}, image, imageElement, surfaces, surface;
+  if (docked === 'top') {
+    me.shiftSurfaces(chartSurfaces, 0, navigatorImageSize.height);
+  } else {
+    me.shiftSurfaces(navigatorSurfaces, 0, chartImageSize.height);
+  }
+  surfaces = chartSurfaces.concat(navigatorSurfaces);
+  surface = surfaces[0];
+  if ((Ext.isIE || Ext.isEdge) && surface.isSVG) {
+    image = {data:surface.toSVG(size, surfaces), type:'svg-markup'};
+  } else {
+    image = surface.flatten(size, surfaces);
+    if (format === 'image') {
+      imageElement = new Image;
+      imageElement.src = image.data;
+      image.data = imageElement;
+      return image;
+    }
+    if (format === 'stream') {
+      image.data = image.data.replace(/^data:image\/[^;]+/, 'data:application/octet-stream');
+      return image;
+    }
+  }
+  me.unshiftSurfaces(surfaces);
+  return image;
+}, shiftSurfaces:function(surfaces, x, y) {
+  var ln = surfaces.length, i = 0, surface;
+  this.surfaceRects = {};
+  for (; i < ln; i++) {
+    surface = surfaces[i];
+    this.shiftSurface(surface, x, y);
+  }
+}, shiftSurface:function(surface, x, y) {
+  var rect = surface.getRect();
+  this.surfaceRects[surface.getId()] = rect.slice();
+  rect[0] += x;
+  rect[1] += y;
+}, unshiftSurfaces:function(surfaces) {
+  var rects = this.surfaceRects, ln = surfaces.length, i = 0, surface, rect, oldRect;
+  if (rects) {
+    for (; i < ln; i++) {
+      surface = surfaces[i];
+      rect = surface.getRect();
+      oldRect = rects[surface.getId()];
+      if (oldRect) {
+        rect[0] = oldRect[0];
+        rect[1] = oldRect[1];
+      }
+    }
+  }
+  this.surfaceRects = null;
+}});
+Ext.define('Ext.chart.plugin.ItemEvents', {extend:Ext.plugin.Abstract, alias:'plugin.chartitemevents', moveEvents:false, mouseMoveEvents:{mousemove:true, mouseover:true, mouseout:true}, itemMouseMoveEvents:{itemmousemove:true, itemmouseover:true, itemmouseout:true}, init:function(chart) {
+  var handleEvent = 'handleEvent';
+  this.chart = chart;
+  chart.addElementListener({click:handleEvent, tap:handleEvent, dblclick:handleEvent, mousedown:handleEvent, mousemove:handleEvent, mouseup:handleEvent, mouseover:handleEvent, mouseout:handleEvent, priority:1001, scope:this});
+}, hasItemMouseMoveListeners:function() {
+  var listeners = this.chart.hasListeners, name;
+  for (name in this.itemMouseMoveEvents) {
+    if (name in listeners) {
+      return true;
+    }
+  }
+  return false;
+}, handleEvent:function(e) {
+  var me = this, chart = me.chart, isMouseMoveEvent = e.type in me.mouseMoveEvents, lastItem = me.lastItem, chartXY, item;
+  if (isMouseMoveEvent && !me.hasItemMouseMoveListeners() && !me.moveEvents) {
+    return;
+  }
+  chartXY = chart.getEventXY(e);
+  item = chart.getItemForPoint(chartXY[0], chartXY[1]);
+  if (isMouseMoveEvent && !Ext.Object.equals(item, lastItem)) {
+    if (lastItem) {
+      chart.fireEvent('itemmouseout', chart, lastItem, e);
+      lastItem.series.fireEvent('itemmouseout', lastItem.series, lastItem, e);
+    }
+    if (item) {
+      chart.fireEvent('itemmouseover', chart, item, e);
+      item.series.fireEvent('itemmouseover', item.series, item, e);
+    }
+  }
+  if (item) {
+    chart.fireEvent('item' + e.type, chart, item, e);
+    item.series.fireEvent('item' + e.type, item.series, item, e);
+  }
+  me.lastItem = item;
+}});
+Ext.define('Ext.chart.series.Cartesian', {extend:Ext.chart.series.Series, config:{xField:null, yField:null, xAxis:null, yAxis:null}, directions:['X', 'Y'], fieldCategoryX:['X'], fieldCategoryY:['Y'], applyXAxis:function(newAxis, oldAxis) {
+  return this.getChart().getAxis(newAxis) || oldAxis;
+}, applyYAxis:function(newAxis, oldAxis) {
+  return this.getChart().getAxis(newAxis) || oldAxis;
+}, updateXAxis:function(axis) {
+  axis.processData(this);
+}, updateYAxis:function(axis) {
+  axis.processData(this);
+}, coordinateX:function() {
+  return this.coordinate('X', 0, 2);
+}, coordinateY:function() {
+  return this.coordinate('Y', 1, 2);
+}, getItemForPoint:function(x, y) {
+  var me = this, sprite = me.getSprites()[0], store = me.getStore(), point;
+  if (sprite && !me.getHidden()) {
+    point = sprite.getNearestDataPoint(x, y);
+  }
+  return point ? {series:me, sprite:sprite, category:me.getItemInstancing() ? 'items' : 'markers', index:point.index, record:store.getData().items[point.index], field:me.getYField(), distance:point.distance} : null;
+}, createSprite:function() {
+  var me = this, sprite = me.callParent(), chart = me.getChart(), xAxis = me.getXAxis();
+  sprite.setAttributes({flipXY:chart.getFlipXY(), xAxis:xAxis});
+  if (sprite.setAggregator && xAxis && xAxis.getAggregator) {
+    if (xAxis.getAggregator) {
+      sprite.setAggregator({strategy:xAxis.getAggregator()});
+    } else {
+      sprite.setAggregator({});
+    }
+  }
+  return sprite;
+}, getSprites:function() {
+  var me = this, chart = this.getChart(), sprites = me.sprites;
+  if (!chart) {
+    return Ext.emptyArray;
+  }
+  if (!sprites.length) {
+    me.createSprite();
+  }
+  return sprites;
+}, getXRange:function() {
+  return [this.dataRange[0], this.dataRange[2]];
+}, getYRange:function() {
+  return [this.dataRange[1], this.dataRange[3]];
+}});
+Ext.define('Ext.chart.series.StackedCartesian', {extend:Ext.chart.series.Cartesian, config:{stacked:true, splitStacks:true, fullStack:false, fullStackTotal:100, hidden:[]}, reversedSpriteZOrder:true, spriteAnimationCount:0, themeColorCount:function() {
+  var me = this, yField = me.getYField();
+  return Ext.isArray(yField) ? yField.length : 1;
+}, updateStacked:function() {
+  this.processData();
+}, updateSplitStacks:function() {
+  this.processData();
+}, coordinateY:function() {
+  return this.coordinateStacked('Y', 1, 2);
+}, coordinateStacked:function(direction, directionOffset, directionCount) {
+  var me = this, store = me.getStore(), items = store.getData().items, itemCount = items.length, axis = me['get' + direction + 'Axis'](), hidden = me.getHidden(), splitStacks = me.getSplitStacks(), fullStack = me.getFullStack(), fullStackTotal = me.getFullStackTotal(), range = [0, 0], directions = me['fieldCategory' + direction], dataStart = [], posDataStart = [], negDataStart = [], dataEnd, stacked = me.getStacked(), sprites = me.getSprites(), coordinatedData = [], i, j, k, fields, fieldCount, posTotals, 
+  negTotals, fieldCategoriesItem, data, attr;
+  if (!sprites.length) {
+    return;
+  }
+  for (i = 0; i < directions.length; i++) {
+    fieldCategoriesItem = directions[i];
+    fields = me.getFields([fieldCategoriesItem]);
+    fieldCount = fields.length;
+    for (j = 0; j < itemCount; j++) {
+      dataStart[j] = 0;
+      posDataStart[j] = 0;
+      negDataStart[j] = 0;
+    }
+    for (j = 0; j < fieldCount; j++) {
+      if (!hidden[j]) {
+        coordinatedData[j] = me.coordinateData(items, fields[j], axis);
+      }
+    }
+    if (stacked && fullStack) {
+      posTotals = [];
+      if (splitStacks) {
+        negTotals = [];
+      }
+      for (j = 0; j < itemCount; j++) {
+        posTotals[j] = 0;
+        if (splitStacks) {
+          negTotals[j] = 0;
+        }
+        for (k = 0; k < fieldCount; k++) {
+          data = coordinatedData[k];
+          if (!data) {
+            continue;
+          }
+          data = data[j];
+          if (data >= 0 || !splitStacks) {
+            posTotals[j] += data;
+          } else {
+            if (data < 0) {
+              negTotals[j] += data;
+            }
+          }
+        }
+      }
+    }
+    for (j = 0; j < fieldCount; j++) {
+      attr = {};
+      if (hidden[j]) {
+        attr['dataStart' + fieldCategoriesItem] = dataStart;
+        attr['data' + fieldCategoriesItem] = dataStart;
+        sprites[j].setAttributes(attr);
+        continue;
+      }
+      data = coordinatedData[j];
+      if (stacked) {
+        dataEnd = [];
+        for (k = 0; k < itemCount; k++) {
+          if (!data[k]) {
+            data[k] = 0;
+          }
+          if (data[k] >= 0 || !splitStacks) {
+            if (fullStack && posTotals[k]) {
+              data[k] *= fullStackTotal / posTotals[k];
+            }
+            dataStart[k] = posDataStart[k];
+            posDataStart[k] += data[k];
+            dataEnd[k] = posDataStart[k];
+          } else {
+            if (fullStack && negTotals[k]) {
+              data[k] *= fullStackTotal / negTotals[k];
+            }
+            dataStart[k] = negDataStart[k];
+            negDataStart[k] += data[k];
+            dataEnd[k] = negDataStart[k];
+          }
+        }
+        attr['dataStart' + fieldCategoriesItem] = dataStart;
+        attr['data' + fieldCategoriesItem] = dataEnd;
+        Ext.chart.Util.expandRange(range, dataStart);
+        Ext.chart.Util.expandRange(range, dataEnd);
+      } else {
+        attr['dataStart' + fieldCategoriesItem] = dataStart;
+        attr['data' + fieldCategoriesItem] = data;
+        Ext.chart.Util.expandRange(range, data);
+      }
+      sprites[j].setAttributes(attr);
+    }
+  }
+  range = Ext.chart.Util.validateRange(range, me.defaultRange);
+  me.dataRange[directionOffset] = range[0];
+  me.dataRange[directionOffset + directionCount] = range[1];
+  attr = {};
+  attr['dataMin' + direction] = range[0];
+  attr['dataMax' + direction] = range[1];
+  for (i = 0; i < sprites.length; i++) {
+    sprites[i].setAttributes(attr);
+  }
+}, getFields:function(fieldCategory) {
+  var me = this, fields = [], ln = fieldCategory.length, i, fieldsItem;
+  for (i = 0; i < ln; i++) {
+    fieldsItem = me['get' + fieldCategory[i] + 'Field']();
+    if (Ext.isArray(fieldsItem)) {
+      fields.push.apply(fields, fieldsItem);
+    } else {
+      fields.push(fieldsItem);
+    }
+  }
+  return fields;
+}, updateLabelOverflowPadding:function(labelOverflowPadding) {
+  var me = this, label;
+  if (!me.isConfiguring) {
+    label = me.getLabel();
+    if (label) {
+      label.setAttributes({labelOverflowPadding:labelOverflowPadding});
+    }
+  }
+}, updateLabelData:function() {
+  var me = this, label = me.getLabel();
+  if (label) {
+    label.setAttributes({labelOverflowPadding:me.getLabelOverflowPadding()});
+  }
+  me.callParent();
+}, getSprites:function() {
+  var me = this, chart = me.getChart(), fields = me.getFields(me.fieldCategoryY), itemInstancing = me.getItemInstancing(), sprites = me.sprites, hidden = me.getHidden(), spritesCreated = false, fieldCount = fields.length, i, sprite;
+  if (!chart) {
+    return [];
+  }
+  for (i = 0; i < fieldCount; i++) {
+    sprite = sprites[i];
+    if (!sprite) {
+      sprite = me.createSprite();
+      sprite.setAttributes({zIndex:(me.reversedSpriteZOrder ? -1 : 1) * i});
+      sprite.setField(fields[i]);
+      spritesCreated = true;
+      hidden.push(false);
+      if (itemInstancing) {
+        sprite.getMarker('items').getTemplate().setAttributes(me.getStyleByIndex(i));
+      } else {
+        sprite.setAttributes(me.getStyleByIndex(i));
+      }
+    }
+  }
+  if (spritesCreated) {
+    me.updateHidden(hidden);
+  }
+  return sprites;
+}, getItemForPoint:function(x, y) {
+  var me = this, sprites = me.getSprites(), store = me.getStore(), hidden = me.getHidden(), minDistance = Infinity, item = null, spriteIndex = -1, pointIndex = -1, point, yField, sprite, i, ln;
+  for (i = 0, ln = sprites.length; i < ln; i++) {
+    if (hidden[i]) {
+      continue;
+    }
+    sprite = sprites[i];
+    point = sprite.getNearestDataPoint(x, y);
+    if (point) {
+      if (point.distance < minDistance) {
+        minDistance = point.distance;
+        pointIndex = point.index;
+        spriteIndex = i;
+      }
+    }
+  }
+  if (spriteIndex > -1) {
+    yField = me.getYField();
+    item = {series:me, sprite:sprites[spriteIndex], category:me.getItemInstancing() ? 'items' : 'markers', index:pointIndex, record:store.getData().items[pointIndex], field:typeof yField === 'string' ? yField : yField[spriteIndex], distance:minDistance};
+  }
+  return item;
+}, provideLegendInfo:function(target) {
+  var me = this, sprites = me.getSprites(), title = me.getTitle(), field = me.getYField(), hidden = me.getHidden(), single = sprites.length === 1, style, fill, i, name;
+  for (i = 0; i < sprites.length; i++) {
+    style = me.getStyleByIndex(i);
+    fill = style.fillStyle;
+    if (title) {
+      if (Ext.isArray(title)) {
+        name = title[i];
+      } else {
+        if (single) {
+          name = title;
+        }
+      }
+    }
+    if (!title || !name) {
+      if (Ext.isArray(field)) {
+        name = field[i];
+      } else {
+        name = me.getId();
+      }
+    }
+    target.push({name:name, mark:(Ext.isObject(fill) ? fill.stops && fill.stops[0].color : fill) || style.strokeStyle || 'black', disabled:hidden[i], series:me.getId(), index:i});
+  }
+}, onSpriteAnimationStart:function(sprite) {
+  this.spriteAnimationCount++;
+  if (this.spriteAnimationCount === 1) {
+    this.fireEvent('animationstart');
+  }
+}, onSpriteAnimationEnd:function(sprite) {
+  this.spriteAnimationCount--;
+  if (this.spriteAnimationCount === 0) {
+    this.fireEvent('animationend');
+  }
+}});
+Ext.define('Ext.chart.series.sprite.Series', {extend:Ext.draw.sprite.Sprite, mixins:{markerHolder:Ext.chart.MarkerHolder}, inheritableStatics:{def:{processors:{dataMinX:'number', dataMaxX:'number', dataMinY:'number', dataMaxY:'number', rangeX:'data', rangeY:'data', dataX:'data', dataY:'data', labels:'default', labelOverflowPadding:'number'}, defaults:{dataMinX:0, dataMaxX:1, dataMinY:0, dataMaxY:1, rangeX:null, rangeY:null, dataX:null, dataY:null, labels:null, labelOverflowPadding:10}, triggers:{dataX:'bbox', 
+dataY:'bbox', dataMinX:'bbox', dataMaxX:'bbox', dataMinY:'bbox', dataMaxY:'bbox'}}}, config:{store:null, series:null, field:null}});
+Ext.define('Ext.chart.series.sprite.Cartesian', {extend:Ext.chart.series.sprite.Series, inheritableStatics:{def:{processors:{selectionTolerance:'number', flipXY:'bool', renderer:'default', visibleMinX:'number', visibleMinY:'number', visibleMaxX:'number', visibleMaxY:'number', innerWidth:'number', innerHeight:'number'}, defaults:{selectionTolerance:20, flipXY:false, renderer:null, transformFillStroke:false, visibleMinX:0, visibleMinY:0, visibleMaxX:1, visibleMaxY:1, innerWidth:1, innerHeight:1}, triggers:{dataX:'dataX,bbox', 
+dataY:'dataY,bbox', visibleMinX:'panzoom', visibleMinY:'panzoom', visibleMaxX:'panzoom', visibleMaxY:'panzoom', innerWidth:'panzoom', innerHeight:'panzoom'}, updaters:{dataX:function(attr) {
+  this.processDataX();
+  this.scheduleUpdater(attr, 'dataY', ['dataY']);
+}, dataY:function() {
+  this.processDataY();
+}, panzoom:function(attr) {
+  var dx = attr.visibleMaxX - attr.visibleMinX, dy = attr.visibleMaxY - attr.visibleMinY, innerWidth = attr.flipXY ? attr.innerHeight : attr.innerWidth, innerHeight = !attr.flipXY ? attr.innerHeight : attr.innerWidth, surface = this.getSurface(), isRtl = surface ? surface.getInherited().rtl : false;
+  attr.scalingCenterX = 0;
+  attr.scalingCenterY = 0;
+  attr.scalingX = innerWidth / dx;
+  attr.scalingY = innerHeight / dy;
+  attr.translationX = -(attr.visibleMinX * attr.scalingX);
+  attr.translationY = -(attr.visibleMinY * attr.scalingY);
+  if (isRtl && !attr.flipXY) {
+    attr.scalingX *= -1;
+    attr.translationX *= -1;
+    attr.translationX += innerWidth;
+  }
+  this.applyTransformations(true);
+}}}}, processDataY:Ext.emptyFn, processDataX:Ext.emptyFn, updatePlainBBox:function(plain) {
+  var attr = this.attr;
+  plain.x = attr.dataMinX;
+  plain.y = attr.dataMinY;
+  plain.width = attr.dataMaxX - attr.dataMinX;
+  plain.height = attr.dataMaxY - attr.dataMinY;
+}, binarySearch:function(key) {
+  var dx = this.attr.dataX, start = 0, end = dx.length;
+  if (key <= dx[0]) {
+    return start;
+  }
+  if (key >= dx[end - 1]) {
+    return end - 1;
+  }
+  while (start + 1 < end) {
+    var mid = start + end >> 1, val = dx[mid];
+    if (val === key) {
+      return mid;
+    } else {
+      if (val < key) {
+        start = mid;
+      } else {
+        end = mid;
+      }
+    }
+  }
+  return start;
+}, render:function(surface, ctx, surfaceClipRect) {
+  var me = this, attr = me.attr, margin = 1, inverseMatrix = attr.inverseMatrix.clone();
+  inverseMatrix.appendMatrix(surface.inverseMatrix);
+  if (attr.dataX === null || attr.dataX === undefined) {
+    return;
+  }
+  if (attr.dataY === null || attr.dataY === undefined) {
+    return;
+  }
+  if (inverseMatrix.getXX() * inverseMatrix.getYX() || inverseMatrix.getXY() * inverseMatrix.getYY()) {
+    Ext.Logger.warn('Cartesian Series sprite does not support rotation/sheering');
+    return;
+  }
+  var dataClipRect = inverseMatrix.transformList([[surfaceClipRect[0] - margin, surfaceClipRect[3] + margin], [surfaceClipRect[0] + surfaceClipRect[2] + margin, -margin]]);
+  dataClipRect = dataClipRect[0].concat(dataClipRect[1]);
+  me.renderClipped(surface, ctx, dataClipRect, surfaceClipRect);
+}, renderClipped:Ext.emptyFn, getIndexNearPoint:function(x, y) {
+  var result = this.getNearestDataPoint(x, y);
+  return result ? result.index : -1;
+}, getNearestDataPoint:function(x, y) {
+  var me = this, attr = me.attr, series = me.getSeries(), surface = me.getSurface(), items = me.boundMarkers.items, matrix = attr.matrix, dataX = attr.dataX, dataY = attr.dataY, selectionTolerance = attr.selectionTolerance, minDistance = Infinity, index = -1, result = null, distance, dx, dy, xy, i, ln, end, inc;
+  if (items) {
+    ln = dataX.length;
+    if (series.reversedSpriteZOrder) {
+      i = ln - 1;
+      end = -1;
+      inc = -1;
+    } else {
+      i = 0;
+      end = ln;
+      inc = 1;
+    }
+    for (; i !== end; i += inc) {
+      var bbox = me.getMarkerBBox('items', i);
+      xy = surface.inverseMatrix.transformPoint([x, y]);
+      if (Ext.draw.Draw.isPointInBBox(xy[0], xy[1], bbox)) {
+        index = i;
+        minDistance = 0;
+        break;
+      }
+    }
+  } else {
+    for (i = 0, ln = dataX.length; i < ln; i++) {
+      xy = matrix.transformPoint([dataX[i], dataY[i]]);
+      xy = surface.matrix.transformPoint(xy);
+      dx = x - xy[0];
+      dy = y - xy[1];
+      distance = Math.sqrt(dx * dx + dy * dy);
+      if (selectionTolerance && distance > selectionTolerance) {
+        continue;
+      }
+      if (distance < minDistance) {
+        minDistance = distance;
+        index = i;
+      }
+    }
+  }
+  if (index > -1) {
+    result = {index:index, distance:minDistance};
+  }
+  return result;
+}});
+Ext.define('Ext.chart.series.sprite.StackedCartesian', {extend:Ext.chart.series.sprite.Cartesian, inheritableStatics:{def:{processors:{groupCount:'number', groupOffset:'number', dataStartY:'data'}, defaults:{selectionTolerance:20, groupCount:1, groupOffset:0, dataStartY:null}, triggers:{dataStartY:'dataY,bbox'}}}});
+Ext.define('Ext.chart.series.sprite.Area', {alias:'sprite.areaSeries', extend:Ext.chart.series.sprite.StackedCartesian, inheritableStatics:{def:{processors:{step:'bool'}, defaults:{selectionTolerance:0, step:false}}}, renderClipped:function(surface, ctx, dataClipRect) {
+  var me = this, store = me.getStore(), series = me.getSeries(), attr = me.attr, dataX = attr.dataX, dataY = attr.dataY, dataStartY = attr.dataStartY, matrix = attr.matrix, x, y, i, lastX, lastY, startX, startY, xx = matrix.elements[0], dx = matrix.elements[4], yy = matrix.elements[3], dy = matrix.elements[5], surfaceMatrix = me.surfaceMatrix, markerCfg = {}, min = Math.min(dataClipRect[0], dataClipRect[2]), max = Math.max(dataClipRect[0], dataClipRect[2]), start = Math.max(0, this.binarySearch(min)), 
+  end = Math.min(dataX.length - 1, this.binarySearch(max) + 1), renderer = attr.renderer, rendererData = {store:store}, rendererChanges;
+  ctx.beginPath();
+  startX = dataX[start] * xx + dx;
+  startY = dataY[start] * yy + dy;
+  ctx.moveTo(startX, startY);
+  if (attr.step) {
+    lastY = startY;
+    for (i = start; i <= end; i++) {
+      x = dataX[i] * xx + dx;
+      y = dataY[i] * yy + dy;
+      ctx.lineTo(x, lastY);
+      ctx.lineTo(x, lastY = y);
+    }
+  } else {
+    for (i = start; i <= end; i++) {
+      x = dataX[i] * xx + dx;
+      y = dataY[i] * yy + dy;
+      ctx.lineTo(x, y);
+    }
+  }
+  if (dataStartY) {
+    if (attr.step) {
+      lastX = dataX[end] * xx + dx;
+      for (i = end; i >= start; i--) {
+        x = dataX[i] * xx + dx;
+        y = dataStartY[i] * yy + dy;
+        ctx.lineTo(lastX, y);
+        ctx.lineTo(lastX = x, y);
+      }
+    } else {
+      for (i = end; i >= start; i--) {
+        x = dataX[i] * xx + dx;
+        y = dataStartY[i] * yy + dy;
+        ctx.lineTo(x, y);
+      }
+    }
+  } else {
+    ctx.lineTo(dataX[end] * xx + dx, y);
+    ctx.lineTo(dataX[end] * xx + dx, dy);
+    ctx.lineTo(startX, dy);
+    ctx.lineTo(startX, dataY[i] * yy + dy);
+  }
+  if (attr.transformFillStroke) {
+    attr.matrix.toContext(ctx);
+  }
+  ctx.fill();
+  if (attr.transformFillStroke) {
+    attr.inverseMatrix.toContext(ctx);
+  }
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  if (attr.step) {
+    for (i = start; i <= end; i++) {
+      x = dataX[i] * xx + dx;
+      y = dataY[i] * yy + dy;
+      ctx.lineTo(x, lastY);
+      ctx.lineTo(x, lastY = y);
+      markerCfg.translationX = surfaceMatrix.x(x, y);
+      markerCfg.translationY = surfaceMatrix.y(x, y);
+      if (renderer) {
+        rendererChanges = Ext.callback(renderer, null, [me, markerCfg, rendererData, i], 0, series);
+        Ext.apply(markerCfg, rendererChanges);
+      }
+      me.putMarker('markers', markerCfg, i, !renderer);
+    }
+  } else {
+    for (i = start; i <= end; i++) {
+      x = dataX[i] * xx + dx;
+      y = dataY[i] * yy + dy;
+      ctx.lineTo(x, y);
+      markerCfg.translationX = surfaceMatrix.x(x, y);
+      markerCfg.translationY = surfaceMatrix.y(x, y);
+      if (renderer) {
+        rendererChanges = Ext.callback(renderer, null, [me, markerCfg, rendererData, i], 0, series);
+        Ext.apply(markerCfg, rendererChanges);
+      }
+      me.putMarker('markers', markerCfg, i, !renderer);
+    }
+  }
+  if (attr.transformFillStroke) {
+    attr.matrix.toContext(ctx);
+  }
+  ctx.stroke();
+}});
+Ext.define('Ext.chart.series.Area', {extend:Ext.chart.series.StackedCartesian, alias:'series.area', type:'area', seriesType:'areaSeries', isArea:true, config:{splitStacks:false}});
+Ext.define('Ext.chart.series.sprite.Bar', {alias:'sprite.barSeries', extend:Ext.chart.series.sprite.StackedCartesian, inheritableStatics:{def:{processors:{minBarWidth:'number', maxBarWidth:'number', minGapWidth:'number', radius:'number', inGroupGapWidth:'number'}, defaults:{minBarWidth:2, maxBarWidth:100, minGapWidth:5, inGroupGapWidth:3, radius:0}}}, drawLabel:function(text, dataX, dataStartY, dataY, labelId) {
+  var me = this, attr = me.attr, label = me.getMarker('labels'), labelTpl = label.getTemplate(), labelCfg = me.labelCfg || (me.labelCfg = {}), surfaceMatrix = me.surfaceMatrix, labelOverflowPadding = attr.labelOverflowPadding, labelDisplay = labelTpl.attr.display, labelOrientation = labelTpl.attr.orientation, isVerticalText = labelOrientation === 'horizontal' && attr.flipXY || labelOrientation === 'vertical' && !attr.flipXY || !labelOrientation, calloutLine = labelTpl.getCalloutLine(), labelY, halfText, 
+  labelBBox, calloutLineLength, changes, hasPendingChanges, params;
+  labelCfg.x = surfaceMatrix.x(dataX, dataY);
+  labelCfg.y = surfaceMatrix.y(dataX, dataY);
+  if (calloutLine) {
+    calloutLineLength = calloutLine.length;
+  } else {
+    calloutLineLength = 0;
+  }
+  if (!attr.flipXY) {
+    labelCfg.rotationRads = -Math.PI * 0.5;
+  } else {
+    labelCfg.rotationRads = 0;
+  }
+  labelCfg.calloutVertical = !attr.flipXY;
+  switch(labelOrientation) {
+    case 'horizontal':
+      labelCfg.rotationRads = 0;
+      labelCfg.calloutVertical = false;
+      break;
+    case 'vertical':
+      labelCfg.rotationRads = -Math.PI * 0.5;
+      labelCfg.calloutVertical = true;
+      break;
+  }
+  labelCfg.text = text;
+  if (labelTpl.attr.renderer) {
+    if (!label.get(labelId)) {
+      label.putMarkerFor('labels', {}, labelId);
+    }
+    params = [text, label, labelCfg, {store:me.getStore()}, labelId];
+    changes = Ext.callback(labelTpl.attr.renderer, null, params, 0, me.getSeries());
+    if (typeof changes === 'string') {
+      labelCfg.text = changes;
+    } else {
+      if (typeof changes === 'object') {
+        if ('text' in changes) {
+          labelCfg.text = changes.text;
+        }
+        hasPendingChanges = true;
+      }
+    }
+  }
+  labelBBox = me.getMarkerBBox('labels', labelId, true);
+  if (!labelBBox) {
+    me.putMarker('labels', labelCfg, labelId);
+    labelBBox = me.getMarkerBBox('labels', labelId, true);
+  }
+  if (calloutLineLength > 0) {
+    halfText = calloutLineLength;
+  } else {
+    if (calloutLineLength === 0) {
+      halfText = (isVerticalText ? labelBBox.width : labelBBox.height) / 2;
+    } else {
+      halfText = (isVerticalText ? labelBBox.width : labelBBox.height) / 2 + labelOverflowPadding;
+    }
+  }
+  if (dataStartY > dataY) {
+    halfText = -halfText;
+  }
+  if (isVerticalText) {
+    labelY = labelDisplay === 'insideStart' ? dataStartY + halfText : dataY - halfText;
+  } else {
+    labelY = labelDisplay === 'insideStart' ? dataStartY + labelOverflowPadding * 2 : dataY - labelOverflowPadding * 2;
+  }
+  labelCfg.x = surfaceMatrix.x(dataX, labelY);
+  labelCfg.y = surfaceMatrix.y(dataX, labelY);
+  labelY = labelDisplay === 'insideStart' ? dataStartY : dataY;
+  labelCfg.calloutStartX = surfaceMatrix.x(dataX, labelY);
+  labelCfg.calloutStartY = surfaceMatrix.y(dataX, labelY);
+  labelY = labelDisplay === 'insideStart' ? dataStartY - halfText : dataY + halfText;
+  labelCfg.calloutPlaceX = surfaceMatrix.x(dataX, labelY);
+  labelCfg.calloutPlaceY = surfaceMatrix.y(dataX, labelY);
+  labelCfg.calloutColor = calloutLine && calloutLine.color || me.attr.fillStyle;
+  if (calloutLine) {
+    if (calloutLine.width) {
+      labelCfg.calloutWidth = calloutLine.width;
+    }
+  } else {
+    labelCfg.calloutColor = 'none';
+  }
+  if (dataStartY > dataY) {
+    halfText = -halfText;
+  }
+  if (Math.abs(dataY - dataStartY) <= halfText * 2 || labelDisplay === 'outside') {
+    labelCfg.callout = 1;
+  } else {
+    labelCfg.callout = 0;
+  }
+  if (hasPendingChanges) {
+    Ext.apply(labelCfg, changes);
+  }
+  me.putMarker('labels', labelCfg, labelId);
+}, drawBar:function(ctx, surface, rect, left, top, right, bottom, index) {
+  var me = this, itemCfg = {}, renderer = me.attr.renderer, changes;
+  itemCfg.x = left;
+  itemCfg.y = top;
+  itemCfg.width = right - left;
+  itemCfg.height = bottom - top;
+  itemCfg.radius = me.attr.radius;
+  if (renderer) {
+    changes = Ext.callback(renderer, null, [me, itemCfg, {store:me.getStore()}, index], 0, me.getSeries());
+    Ext.apply(itemCfg, changes);
+  }
+  me.putMarker('items', itemCfg, index, !renderer);
+}, renderClipped:function(surface, ctx, dataClipRect) {
+  if (this.cleanRedraw) {
+    return;
+  }
+  var me = this, attr = me.attr, dataX = attr.dataX, dataY = attr.dataY, dataText = attr.labels, dataStartY = attr.dataStartY, groupCount = attr.groupCount, groupOffset = attr.groupOffset - (groupCount - 1) * 0.5, inGroupGapWidth = attr.inGroupGapWidth, lineWidth = ctx.lineWidth, matrix = attr.matrix, xx = matrix.elements[0], yy = matrix.elements[3], dx = matrix.elements[4], dy = surface.roundPixel(matrix.elements[5]) - 1, maxBarWidth = Math.abs(xx) - attr.minGapWidth, minBarWidth = (Math.min(maxBarWidth, 
+  attr.maxBarWidth) - inGroupGapWidth * (groupCount - 1)) / groupCount, barWidth = surface.roundPixel(Math.max(attr.minBarWidth, minBarWidth)), surfaceMatrix = me.surfaceMatrix, left, right, bottom, top, i, center, halfLineWidth = 0.5 * attr.lineWidth, min = Math.min(dataClipRect[0], dataClipRect[2]), max = Math.max(dataClipRect[0], dataClipRect[2]), start = Math.max(0, Math.floor(min)), end = Math.min(dataX.length - 1, Math.ceil(max)), isDrawLabels = dataText && me.getMarker('labels'), yLow, yHi;
+  for (i = start; i <= end; i++) {
+    yLow = dataStartY ? dataStartY[i] : 0;
+    yHi = dataY[i];
+    center = dataX[i] * xx + dx + groupOffset * (barWidth + inGroupGapWidth);
+    left = surface.roundPixel(center - barWidth / 2) + halfLineWidth;
+    top = surface.roundPixel(yHi * yy + dy + lineWidth);
+    right = surface.roundPixel(center + barWidth / 2) - halfLineWidth;
+    bottom = surface.roundPixel(yLow * yy + dy + lineWidth);
+    me.drawBar(ctx, surface, dataClipRect, left, top - halfLineWidth, right, bottom - halfLineWidth, i);
+    if (isDrawLabels && dataText[i] != null) {
+      me.drawLabel(dataText[i], center, bottom, top, i);
+    }
+    me.putMarker('markers', {translationX:surfaceMatrix.x(center, top), translationY:surfaceMatrix.y(center, top)}, i, true);
+  }
+}});
+Ext.define('Ext.chart.series.Bar', {extend:Ext.chart.series.StackedCartesian, alias:'series.bar', type:'bar', seriesType:'barSeries', isBar:true, config:{itemInstancing:{type:'rect', animation:{customDurations:{x:0, y:0, width:0, height:0, radius:0}}}}, getItemForPoint:function(x, y) {
+  if (this.getSprites().length) {
+    var chart = this.getChart(), padding = chart.getInnerPadding(), isRtl = chart.getInherited().rtl;
+    arguments[0] = x + (isRtl ? padding.right : -padding.left);
+    arguments[1] = y + padding.bottom;
+    return this.callParent(arguments);
+  }
+}, updateXAxis:function(xAxis) {
+  if (!this.is3D && !xAxis.isCategory) {
+    Ext.raise("'bar' series should be used with a 'category' axis. Please refer to the bar series docs.");
+  }
+  xAxis.setExpandRangeBy(0.5);
+  this.callParent(arguments);
+}, updateHidden:function(hidden) {
+  this.callParent(arguments);
+  this.updateStacked();
+}, updateStacked:function(stacked) {
+  var me = this, attributes = {}, sprites = me.getSprites(), spriteCount = sprites.length, visibleSprites = [], visibleSpriteCount, i;
+  for (i = 0; i < spriteCount; i++) {
+    if (!sprites[i].attr.hidden) {
+      visibleSprites.push(sprites[i]);
+    }
+  }
+  visibleSpriteCount = visibleSprites.length;
+  if (me.getStacked()) {
+    attributes.groupCount = 1;
+    attributes.groupOffset = 0;
+    for (i = 0; i < visibleSpriteCount; i++) {
+      visibleSprites[i].setAttributes(attributes);
+    }
+  } else {
+    attributes.groupCount = visibleSpriteCount;
+    for (i = 0; i < visibleSpriteCount; i++) {
+      attributes.groupOffset = i;
+      visibleSprites[i].setAttributes(attributes);
+    }
+  }
+  me.callParent(arguments);
+}});
+Ext.define('Ext.chart.series.sprite.Bar3D', {extend:Ext.chart.series.sprite.Bar, alias:'sprite.bar3dSeries', inheritableStatics:{def:{processors:{depthWidthRatio:'number', saturationFactor:'number', brightnessFactor:'number', colorSpread:'number'}, defaults:{depthWidthRatio:1 / 3, saturationFactor:1, brightnessFactor:1, colorSpread:1, transformFillStroke:true}, triggers:{groupCount:'panzoom'}, updaters:{panzoom:function(attr) {
+  var me = this, dx = attr.visibleMaxX - attr.visibleMinX, dy = attr.visibleMaxY - attr.visibleMinY, innerWidth = attr.flipXY ? attr.innerHeight : attr.innerWidth, innerHeight = !attr.flipXY ? attr.innerHeight : attr.innerWidth, surface = me.getSurface(), isRtl = surface ? surface.getInherited().rtl : false;
+  if (isRtl && !attr.flipXY) {
+    attr.translationX = innerWidth + attr.visibleMinX * innerWidth / dx;
+  } else {
+    attr.translationX = -attr.visibleMinX * innerWidth / dx;
+  }
+  attr.translationY = -attr.visibleMinY * (innerHeight - me.depth) / dy;
+  attr.scalingX = (isRtl && !attr.flipXY ? -1 : 1) * innerWidth / dx;
+  attr.scalingY = (innerHeight - me.depth) / dy;
+  attr.scalingCenterX = 0;
+  attr.scalingCenterY = 0;
+  me.applyTransformations(true);
+}}}}, config:{showStroke:false}, depth:0, drawBar:function(ctx, surface, clip, left, top, right, bottom, index) {
+  var me = this, attr = me.attr, itemCfg = {}, renderer = attr.renderer, changes, depth, series, params;
+  itemCfg.x = (left + right) * 0.5;
+  itemCfg.y = top;
+  itemCfg.width = (right - left) * 0.75;
+  itemCfg.height = bottom - top;
+  itemCfg.depth = depth = itemCfg.width * attr.depthWidthRatio;
+  itemCfg.orientation = attr.flipXY ? 'horizontal' : 'vertical';
+  itemCfg.saturationFactor = attr.saturationFactor;
+  itemCfg.brightnessFactor = attr.brightnessFactor;
+  itemCfg.colorSpread = attr.colorSpread;
+  if (depth !== me.depth) {
+    me.depth = depth;
+    series = me.getSeries();
+    series.fireEvent('depthchange', series, depth);
+  }
+  if (renderer) {
+    params = [me, itemCfg, {store:me.getStore()}, index];
+    changes = Ext.callback(renderer, null, params, 0, me.getSeries());
+    Ext.apply(itemCfg, changes);
+  }
+  me.putMarker('items', itemCfg, index, !renderer);
+}});
+Ext.define('Ext.chart.sprite.Bar3D', {extend:Ext.draw.sprite.Sprite, alias:'sprite.bar3d', type:'bar3d', inheritableStatics:{def:{processors:{x:'number', y:'number', width:'number', height:'number', depth:'number', orientation:'enums(vertical,horizontal)', showStroke:'bool', saturationFactor:'number', brightnessFactor:'number', colorSpread:'number'}, triggers:{x:'bbox', y:'bbox', width:'bbox', height:'bbox', depth:'bbox', orientation:'bbox'}, defaults:{x:0, y:0, width:8, height:8, depth:8, orientation:'vertical', 
+showStroke:false, saturationFactor:1, brightnessFactor:1, colorSpread:1, lineJoin:'bevel'}}}, constructor:function(config) {
+  this.callParent([config]);
+  this.topGradient = new Ext.draw.gradient.Linear({});
+  this.rightGradient = new Ext.draw.gradient.Linear({});
+  this.frontGradient = new Ext.draw.gradient.Linear({});
+}, updatePlainBBox:function(plain) {
+  var attr = this.attr, x = attr.x, y = attr.y, width = attr.width, height = attr.height, depth = attr.depth;
+  plain.x = x - width * 0.5;
+  plain.width = width + depth;
+  if (height > 0) {
+    plain.y = y;
+    plain.height = height + depth;
+  } else {
+    plain.y = y + depth;
+    plain.height = height - depth;
+  }
+}, render:function(surface, ctx) {
+  var me = this, attr = me.attr, center = attr.x, top = attr.y, bottom = top + attr.height, isNegative = top < bottom, halfWidth = attr.width * 0.5, depth = attr.depth, isHorizontal = attr.orientation === 'horizontal', isTransparent = attr.globalAlpha < 1, fillStyle = attr.fillStyle, color = Ext.util.Color.create(fillStyle.isGradient ? fillStyle.getStops()[0].color : fillStyle), saturationFactor = attr.saturationFactor, brightnessFactor = attr.brightnessFactor, colorSpread = attr.colorSpread, hsv = 
+  color.getHSV(), bbox = {}, roundX, roundY, temp;
+  if (!attr.showStroke) {
+    ctx.strokeStyle = Ext.util.Color.RGBA_NONE;
+  }
+  if (isNegative) {
+    temp = top;
+    top = bottom;
+    bottom = temp;
+  }
+  me.topGradient.setDegrees(isHorizontal ? 0 : 80);
+  me.topGradient.setStops([{offset:0, color:Ext.util.Color.fromHSV(hsv[0], Ext.Number.constrain(hsv[1] * saturationFactor, 0, 1), Ext.Number.constrain((0.5 + colorSpread * 0.1) * brightnessFactor, 0, 1))}, {offset:1, color:Ext.util.Color.fromHSV(hsv[0], Ext.Number.constrain(hsv[1] * saturationFactor, 0, 1), Ext.Number.constrain((0.5 - colorSpread * 0.11) * brightnessFactor, 0, 1))}]);
+  me.rightGradient.setDegrees(isHorizontal ? 45 : 90);
+  me.rightGradient.setStops([{offset:0, color:Ext.util.Color.fromHSV(hsv[0], Ext.Number.constrain(hsv[1] * saturationFactor, 0, 1), Ext.Number.constrain((0.5 - colorSpread * 0.14) * brightnessFactor, 0, 1))}, {offset:1, color:Ext.util.Color.fromHSV(hsv[0], Ext.Number.constrain(hsv[1] * (1 + colorSpread * 0.4) * saturationFactor, 0, 1), Ext.Number.constrain((0.5 - colorSpread * 0.32) * brightnessFactor, 0, 1))}]);
+  if (isHorizontal) {
+    me.frontGradient.setDegrees(0);
+  } else {
+    me.frontGradient.setRadians(Math.atan2(top - bottom, halfWidth * 2));
+  }
+  me.frontGradient.setStops([{offset:0, color:Ext.util.Color.fromHSV(hsv[0], Ext.Number.constrain(hsv[1] * (1 - colorSpread * 0.1) * saturationFactor, 0, 1), Ext.Number.constrain((0.5 + colorSpread * 0.1) * brightnessFactor, 0, 1))}, {offset:1, color:Ext.util.Color.fromHSV(hsv[0], Ext.Number.constrain(hsv[1] * (1 + colorSpread * 0.1) * saturationFactor, 0, 1), Ext.Number.constrain((0.5 - colorSpread * 0.23) * brightnessFactor, 0, 1))}]);
+  if (isTransparent || isNegative) {
+    ctx.beginPath();
+    ctx.moveTo(center - halfWidth, bottom);
+    ctx.lineTo(center - halfWidth + depth, bottom + depth);
+    ctx.lineTo(center + halfWidth + depth, bottom + depth);
+    ctx.lineTo(center + halfWidth, bottom);
+    ctx.closePath();
+    bbox.x = center - halfWidth;
+    bbox.y = top;
+    bbox.width = halfWidth + depth;
+    bbox.height = depth;
+    ctx.fillStyle = (isHorizontal ? me.rightGradient : me.topGradient).generateGradient(ctx, bbox);
+    ctx.fillStroke(attr);
+  }
+  if (isTransparent) {
+    ctx.beginPath();
+    ctx.moveTo(center - halfWidth, top);
+    ctx.lineTo(center - halfWidth + depth, top + depth);
+    ctx.lineTo(center - halfWidth + depth, bottom + depth);
+    ctx.lineTo(center - halfWidth, bottom);
+    ctx.closePath();
+    bbox.x = center + halfWidth;
+    bbox.y = bottom;
+    bbox.width = depth;
+    bbox.height = top + depth - bottom;
+    ctx.fillStyle = (isHorizontal ? me.topGradient : me.rightGradient).generateGradient(ctx, bbox);
+    ctx.fillStroke(attr);
+  }
+  roundY = surface.roundPixel(top);
+  ctx.beginPath();
+  ctx.moveTo(center - halfWidth, roundY);
+  ctx.lineTo(center - halfWidth + depth, top + depth);
+  ctx.lineTo(center + halfWidth + depth, top + depth);
+  ctx.lineTo(center + halfWidth, roundY);
+  ctx.closePath();
+  bbox.x = center - halfWidth;
+  bbox.y = top;
+  bbox.width = halfWidth + depth;
+  bbox.height = depth;
+  ctx.fillStyle = (isHorizontal ? me.rightGradient : me.topGradient).generateGradient(ctx, bbox);
+  ctx.fillStroke(attr);
+  roundX = surface.roundPixel(center + halfWidth);
+  ctx.beginPath();
+  ctx.moveTo(roundX, surface.roundPixel(top));
+  ctx.lineTo(center + halfWidth + depth, top + depth);
+  ctx.lineTo(center + halfWidth + depth, bottom + depth);
+  ctx.lineTo(roundX, bottom);
+  ctx.closePath();
+  bbox.x = center + halfWidth;
+  bbox.y = bottom;
+  bbox.width = depth;
+  bbox.height = top + depth - bottom;
+  ctx.fillStyle = (isHorizontal ? me.topGradient : me.rightGradient).generateGradient(ctx, bbox);
+  ctx.fillStroke(attr);
+  roundX = surface.roundPixel(center + halfWidth);
+  roundY = surface.roundPixel(top);
+  ctx.beginPath();
+  ctx.moveTo(center - halfWidth, bottom);
+  ctx.lineTo(center - halfWidth, roundY);
+  ctx.lineTo(roundX, roundY);
+  ctx.lineTo(roundX, bottom);
+  ctx.closePath();
+  bbox.x = center - halfWidth;
+  bbox.y = bottom;
+  bbox.width = halfWidth * 2;
+  bbox.height = top - bottom;
+  ctx.fillStyle = me.frontGradient.generateGradient(ctx, bbox);
+  ctx.fillStroke(attr);
+}});
+Ext.define('Ext.chart.series.Bar3D', {extend:Ext.chart.series.Bar, alias:'series.bar3d', type:'bar3d', seriesType:'bar3dSeries', is3D:true, config:{itemInstancing:{type:'bar3d', animation:{customDurations:{x:0, y:0, width:0, height:0, depth:0}}}, highlightCfg:{opacity:0.8}}, reversedSpriteZOrder:false, updateXAxis:function(xAxis, oldXAxis) {
+  if (xAxis.type !== 'category3d') {
+    Ext.raise("'bar3d' series should be used with a 'category3d' axis." + " Please refer to the 'bar3d' series docs.");
+  }
+  this.callParent([xAxis, oldXAxis]);
+}, getDepth:function() {
+  var sprite = this.getSprites()[0];
+  return sprite ? sprite.depth || 0 : 0;
+}});
+Ext.define('Ext.chart.series.sprite.BoxPlot', {alias:'sprite.boxplotSeries', extend:Ext.chart.series.sprite.Cartesian, inheritableStatics:{def:{processors:{dataLow:'data', dataQ1:'data', dataQ3:'data', dataHigh:'data', minBoxWidth:'number', maxBoxWidth:'number', minGapWidth:'number'}, aliases:{dataMedian:'dataY'}, defaults:{minBoxWidth:2, maxBoxWidth:40, minGapWidth:5}}}, renderClipped:function(surface, ctx, dataClipRect) {
+  if (this.cleanRedraw) {
+    return;
+  }
+  var me = this, attr = me.attr, series = me.getSeries(), renderer = attr.renderer, rendererData = {store:me.getStore()}, itemCfg = {}, dataX = attr.dataX, dataLow = attr.dataLow, dataQ1 = attr.dataQ1, dataMedian = attr.dataY, dataQ3 = attr.dataQ3, dataHigh = attr.dataHigh, min = Math.min(dataClipRect[0], dataClipRect[2]), max = Math.max(dataClipRect[0], dataClipRect[2]), start = Math.max(0, Math.floor(min)), end = Math.min(dataX.length - 1, Math.ceil(max)), matrix = attr.matrix, xx = matrix.elements[0], 
+  yy = matrix.elements[3], dx = matrix.elements[4], dy = matrix.elements[5], maxBoxWidth = Math.abs(xx) - attr.minGapWidth, minBoxWidth = Math.min(maxBoxWidth, attr.maxBoxWidth), boxWidth = Math.round(Math.max(attr.minBoxWidth, minBoxWidth)), x, low, q1, median, q3, high, rendererParams, changes, i;
+  if (renderer) {
+    rendererParams = [me, itemCfg, rendererData];
+  }
+  for (i = start; i <= end; i++) {
+    x = dataX[i] * xx + dx;
+    low = dataLow[i] * yy + dy;
+    q1 = dataQ1[i] * yy + dy;
+    median = dataMedian[i] * yy + dy;
+    q3 = dataQ3[i] * yy + dy;
+    high = dataHigh[i] * yy + dy;
+    itemCfg.x = x;
+    itemCfg.low = low;
+    itemCfg.q1 = q1;
+    itemCfg.median = median;
+    itemCfg.q3 = q3;
+    itemCfg.high = high;
+    itemCfg.boxWidth = boxWidth;
+    if (renderer) {
+      rendererParams[3] = i;
+      changes = Ext.callback(renderer, null, rendererParams, 0, series);
+      Ext.apply(itemCfg, changes);
+    }
+    me.putMarker('items', itemCfg, i, !renderer);
+  }
+}});
+Ext.define('Ext.chart.sprite.BoxPlot', {extend:Ext.draw.sprite.Sprite, alias:'sprite.boxplot', type:'boxplot', inheritableStatics:{def:{processors:{x:'number', low:'number', q1:'number', median:'number', q3:'number', high:'number', boxWidth:'number', whiskerWidth:'number', crisp:'bool'}, triggers:{x:'bbox', low:'bbox', high:'bbox', boxWidth:'bbox', whiskerWidth:'bbox', crisp:'bbox'}, defaults:{x:0, low:-20, q1:-10, median:0, q3:10, high:20, boxWidth:12, whiskerWidth:0.5, crisp:true, fillStyle:'#ccc', 
+strokeStyle:'#000'}}}, updatePlainBBox:function(plain) {
+  var me = this, attr = me.attr, halfLineWidth = attr.lineWidth / 2, x = attr.x - attr.boxWidth / 2 - halfLineWidth, y = attr.high - halfLineWidth, width = attr.boxWidth + attr.lineWidth, height = attr.low - attr.high + attr.lineWidth;
+  plain.x = x;
+  plain.y = y;
+  plain.width = width;
+  plain.height = height;
+}, render:function(surface, ctx) {
+  var me = this, attr = me.attr;
+  attr.matrix.toContext(ctx);
+  if (attr.crisp) {
+    me.crispRender(surface, ctx);
+  } else {
+    me.softRender(surface, ctx);
+  }
+  var debug = attr.debug || this.statics().debug || Ext.draw.sprite.Sprite.debug;
+  if (debug) {
+    this.attr.inverseMatrix.toContext(ctx);
+    debug.bbox && this.renderBBox(surface, ctx);
+  }
+}, softRender:function(surface, ctx) {
+  var me = this, attr = me.attr, x = attr.x, low = attr.low, q1 = attr.q1, median = attr.median, q3 = attr.q3, high = attr.high, halfBoxWidth = attr.boxWidth / 2, halfWhiskerWidth = attr.boxWidth * attr.whiskerWidth / 2, dash = ctx.getLineDash();
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(x - halfBoxWidth, q3);
+  ctx.lineTo(x + halfBoxWidth, q3);
+  ctx.lineTo(x + halfBoxWidth, q1);
+  ctx.lineTo(x - halfBoxWidth, q1);
+  ctx.closePath();
+  ctx.fillStroke(attr, true);
+  ctx.setLineDash(dash);
+  ctx.beginPath();
+  ctx.moveTo(x, q3);
+  ctx.lineTo(x, high);
+  ctx.moveTo(x, q1);
+  ctx.lineTo(x, low);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(x - halfWhiskerWidth, low);
+  ctx.lineTo(x + halfWhiskerWidth, low);
+  ctx.moveTo(x - halfBoxWidth, median);
+  ctx.lineTo(x + halfBoxWidth, median);
+  ctx.moveTo(x - halfWhiskerWidth, high);
+  ctx.lineTo(x + halfWhiskerWidth, high);
+  ctx.stroke();
+}, alignLine:function(x, lineWidth) {
+  lineWidth = lineWidth || this.attr.lineWidth;
+  x = Math.round(x);
+  if (lineWidth % 2 === 1) {
+    x -= 0.5;
+  }
+  return x;
+}, crispRender:function(surface, ctx) {
+  var me = this, attr = me.attr, x = attr.x, low = me.alignLine(attr.low), q1 = me.alignLine(attr.q1), median = me.alignLine(attr.median), q3 = me.alignLine(attr.q3), high = me.alignLine(attr.high), halfBoxWidth = attr.boxWidth / 2, halfWhiskerWidth = attr.boxWidth * attr.whiskerWidth / 2, stemX = me.alignLine(x), boxLeft = me.alignLine(x - halfBoxWidth), boxRight = me.alignLine(x + halfBoxWidth), whiskerLeft = stemX + Math.round(-halfWhiskerWidth), whiskerRight = stemX + Math.round(halfWhiskerWidth), 
+  dash = ctx.getLineDash();
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(boxLeft, q3);
+  ctx.lineTo(boxRight, q3);
+  ctx.lineTo(boxRight, q1);
+  ctx.lineTo(boxLeft, q1);
+  ctx.closePath();
+  ctx.fillStroke(attr, true);
+  ctx.setLineDash(dash);
+  ctx.beginPath();
+  ctx.moveTo(stemX, q3);
+  ctx.lineTo(stemX, high);
+  ctx.moveTo(stemX, q1);
+  ctx.lineTo(stemX, low);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(whiskerLeft, low);
+  ctx.lineTo(whiskerRight, low);
+  ctx.moveTo(boxLeft, median);
+  ctx.lineTo(boxRight, median);
+  ctx.moveTo(whiskerLeft, high);
+  ctx.lineTo(whiskerRight, high);
+  ctx.stroke();
+}});
+Ext.define('Ext.chart.series.BoxPlot', {extend:Ext.chart.series.Cartesian, alias:'series.boxplot', type:'boxplot', seriesType:'boxplotSeries', isBoxPlot:true, config:{itemInstancing:{type:'boxplot', animation:{customDurations:{x:0, low:0, q1:0, median:0, q3:0, high:0}}}, lowField:'low', q1Field:'q1', medianField:'median', q3Field:'q3', highField:'high'}, fieldCategoryY:['Low', 'Q1', 'Median', 'Q3', 'High'], updateXAxis:function(xAxis) {
+  xAxis.setExpandRangeBy(0.5);
+  this.callParent(arguments);
+}});
+Ext.define('Ext.draw.LimitedCache', {config:{limit:40, feeder:function() {
+  return 0;
+}, scope:null}, cache:null, constructor:function(config) {
+  this.cache = {};
+  this.cache.list = [];
+  this.cache.tail = 0;
+  this.initConfig(config);
+}, get:function(id) {
+  var cache = this.cache, limit = this.getLimit(), feeder = this.getFeeder(), scope = this.getScope() || this;
+  if (cache[id]) {
+    return cache[id].value;
+  }
+  if (cache.list[cache.tail]) {
+    delete cache[cache.list[cache.tail].cacheId];
+  }
+  cache[id] = cache.list[cache.tail] = {value:feeder.apply(scope, Array.prototype.slice.call(arguments, 1)), cacheId:id};
+  cache.tail++;
+  if (cache.tail === limit) {
+    cache.tail = 0;
+  }
+  return cache[id].value;
+}, clear:function() {
+  this.cache = {};
+  this.cache.list = [];
+  this.cache.tail = 0;
+}});
+Ext.define('Ext.draw.SegmentTree', {config:{strategy:'double'}, time:function(result, last, dataX, dataOpen, dataHigh, dataLow, dataClose) {
+  var start = 0, lastOffset, lastOffsetEnd, minimum = new Date(dataX[result.startIdx[0]]), maximum = new Date(dataX[result.endIdx[last - 1]]), extDate = Ext.Date, units = [[extDate.MILLI, 1, 'ms1', null], [extDate.MILLI, 2, 'ms2', 'ms1'], [extDate.MILLI, 5, 'ms5', 'ms1'], [extDate.MILLI, 10, 'ms10', 'ms5'], [extDate.MILLI, 50, 'ms50', 'ms10'], [extDate.MILLI, 100, 'ms100', 'ms50'], [extDate.MILLI, 500, 'ms500', 'ms100'], [extDate.SECOND, 1, 's1', 'ms500'], [extDate.SECOND, 10, 's10', 's1'], [extDate.SECOND, 
+  30, 's30', 's10'], [extDate.MINUTE, 1, 'mi1', 's10'], [extDate.MINUTE, 5, 'mi5', 'mi1'], [extDate.MINUTE, 10, 'mi10', 'mi5'], [extDate.MINUTE, 30, 'mi30', 'mi10'], [extDate.HOUR, 1, 'h1', 'mi30'], [extDate.HOUR, 6, 'h6', 'h1'], [extDate.HOUR, 12, 'h12', 'h6'], [extDate.DAY, 1, 'd1', 'h12'], [extDate.DAY, 7, 'd7', 'd1'], [extDate.MONTH, 1, 'mo1', 'd1'], [extDate.MONTH, 3, 'mo3', 'mo1'], [extDate.MONTH, 6, 'mo6', 'mo3'], [extDate.YEAR, 1, 'y1', 'mo3'], [extDate.YEAR, 5, 'y5', 'y1'], [extDate.YEAR, 
+  10, 'y10', 'y5'], [extDate.YEAR, 100, 'y100', 'y10']], unitIdx, currentUnit, plainStart = start, plainEnd = last, first = false, startIdxs = result.startIdx, endIdxs = result.endIdx, minIdxs = result.minIdx, maxIdxs = result.maxIdx, opens = result.open, closes = result.close, minXs = result.minX, minYs = result.minY, maxXs = result.maxX, maxYs = result.maxY, i, current;
+  for (unitIdx = 0; last > start + 1 && unitIdx < units.length; unitIdx++) {
+    minimum = new Date(dataX[startIdxs[0]]);
+    currentUnit = units[unitIdx];
+    minimum = extDate.align(minimum, currentUnit[0], currentUnit[1]);
+    if (extDate.diff(minimum, maximum, currentUnit[0]) > dataX.length * 2 * currentUnit[1]) {
+      continue;
+    }
+    if (currentUnit[3] && result.map['time_' + currentUnit[3]]) {
+      lastOffset = result.map['time_' + currentUnit[3]][0];
+      lastOffsetEnd = result.map['time_' + currentUnit[3]][1];
+    } else {
+      lastOffset = plainStart;
+      lastOffsetEnd = plainEnd;
+    }
+    start = last;
+    current = minimum;
+    first = true;
+    startIdxs[last] = startIdxs[lastOffset];
+    endIdxs[last] = endIdxs[lastOffset];
+    minIdxs[last] = minIdxs[lastOffset];
+    maxIdxs[last] = maxIdxs[lastOffset];
+    opens[last] = opens[lastOffset];
+    closes[last] = closes[lastOffset];
+    minXs[last] = minXs[lastOffset];
+    minYs[last] = minYs[lastOffset];
+    maxXs[last] = maxXs[lastOffset];
+    maxYs[last] = maxYs[lastOffset];
+    current = Ext.Date.add(current, currentUnit[0], currentUnit[1]);
+    for (i = lastOffset + 1; i < lastOffsetEnd; i++) {
+      if (dataX[endIdxs[i]] < +current) {
+        endIdxs[last] = endIdxs[i];
+        closes[last] = closes[i];
+        if (maxYs[i] > maxYs[last]) {
+          maxYs[last] = maxYs[i];
+          maxXs[last] = maxXs[i];
+          maxIdxs[last] = maxIdxs[i];
+        }
+        if (minYs[i] < minYs[last]) {
+          minYs[last] = minYs[i];
+          minXs[last] = minXs[i];
+          minIdxs[last] = minIdxs[i];
+        }
+      } else {
+        last++;
+        startIdxs[last] = startIdxs[i];
+        endIdxs[last] = endIdxs[i];
+        minIdxs[last] = minIdxs[i];
+        maxIdxs[last] = maxIdxs[i];
+        opens[last] = opens[i];
+        closes[last] = closes[i];
+        minXs[last] = minXs[i];
+        minYs[last] = minYs[i];
+        maxXs[last] = maxXs[i];
+        maxYs[last] = maxYs[i];
+        current = Ext.Date.add(current, currentUnit[0], currentUnit[1]);
+      }
+    }
+    if (last > start) {
+      result.map['time_' + currentUnit[2]] = [start, last];
+    }
+  }
+}, 'double':function(result, position, dataX, dataOpen, dataHigh, dataLow, dataClose) {
+  var offset = 0, lastOffset, step = 1, i, startIdx, endIdx, minIdx, maxIdx, open, close, minX, minY, maxX, maxY;
+  while (position > offset + 1) {
+    lastOffset = offset;
+    offset = position;
+    step += step;
+    for (i = lastOffset; i < offset; i += 2) {
+      if (i === offset - 1) {
+        startIdx = result.startIdx[i];
+        endIdx = result.endIdx[i];
+        minIdx = result.minIdx[i];
+        maxIdx = result.maxIdx[i];
+        open = result.open[i];
+        close = result.close[i];
+        minX = result.minX[i];
+        minY = result.minY[i];
+        maxX = result.maxX[i];
+        maxY = result.maxY[i];
+      } else {
+        startIdx = result.startIdx[i];
+        endIdx = result.endIdx[i + 1];
+        open = result.open[i];
+        close = result.close[i];
+        if (result.minY[i] <= result.minY[i + 1]) {
+          minIdx = result.minIdx[i];
+          minX = result.minX[i];
+          minY = result.minY[i];
+        } else {
+          minIdx = result.minIdx[i + 1];
+          minX = result.minX[i + 1];
+          minY = result.minY[i + 1];
+        }
+        if (result.maxY[i] >= result.maxY[i + 1]) {
+          maxIdx = result.maxIdx[i];
+          maxX = result.maxX[i];
+          maxY = result.maxY[i];
+        } else {
+          maxIdx = result.maxIdx[i + 1];
+          maxX = result.maxX[i + 1];
+          maxY = result.maxY[i + 1];
+        }
+      }
+      result.startIdx[position] = startIdx;
+      result.endIdx[position] = endIdx;
+      result.minIdx[position] = minIdx;
+      result.maxIdx[position] = maxIdx;
+      result.open[position] = open;
+      result.close[position] = close;
+      result.minX[position] = minX;
+      result.minY[position] = minY;
+      result.maxX[position] = maxX;
+      result.maxY[position] = maxY;
+      position++;
+    }
+    result.map['double_' + step] = [offset, position];
+  }
+}, none:Ext.emptyFn, aggregateData:function(dataX, dataOpen, dataHigh, dataLow, dataClose) {
+  var length = dataX.length, startIdx = [], endIdx = [], minIdx = [], maxIdx = [], open = [], minX = [], minY = [], maxX = [], maxY = [], close = [], result = {startIdx:startIdx, endIdx:endIdx, minIdx:minIdx, maxIdx:maxIdx, open:open, minX:minX, minY:minY, maxX:maxX, maxY:maxY, close:close}, i;
+  for (i = 0; i < length; i++) {
+    startIdx[i] = i;
+    endIdx[i] = i;
+    minIdx[i] = i;
+    maxIdx[i] = i;
+    open[i] = dataOpen[i];
+    minX[i] = dataX[i];
+    minY[i] = dataLow[i];
+    maxX[i] = dataX[i];
+    maxY[i] = dataHigh[i];
+    close[i] = dataClose[i];
+  }
+  result.map = {original:[0, length]};
+  if (length) {
+    this[this.getStrategy()](result, length, dataX, dataOpen, dataHigh, dataLow, dataClose);
+  }
+  return result;
+}, binarySearchMin:function(items, start, end, key) {
+  var dx = this.dataX;
+  if (key <= dx[items.startIdx[0]]) {
+    return start;
+  }
+  if (key >= dx[items.startIdx[end - 1]]) {
+    return end - 1;
+  }
+  while (start + 1 < end) {
+    var mid = start + end >> 1, val = dx[items.startIdx[mid]];
+    if (val === key) {
+      return mid;
+    } else {
+      if (val < key) {
+        start = mid;
+      } else {
+        end = mid;
+      }
+    }
+  }
+  return start;
+}, binarySearchMax:function(items, start, end, key) {
+  var dx = this.dataX;
+  if (key <= dx[items.endIdx[0]]) {
+    return start;
+  }
+  if (key >= dx[items.endIdx[end - 1]]) {
+    return end - 1;
+  }
+  while (start + 1 < end) {
+    var mid = start + end >> 1, val = dx[items.endIdx[mid]];
+    if (val === key) {
+      return mid;
+    } else {
+      if (val < key) {
+        start = mid;
+      } else {
+        end = mid;
+      }
+    }
+  }
+  return end;
+}, constructor:function(config) {
+  this.initConfig(config);
+}, setData:function(dataX, dataOpen, dataHigh, dataLow, dataClose) {
+  if (!dataHigh) {
+    dataClose = dataLow = dataHigh = dataOpen;
+  }
+  this.dataX = dataX;
+  this.dataOpen = dataOpen;
+  this.dataHigh = dataHigh;
+  this.dataLow = dataLow;
+  this.dataClose = dataClose;
+  if (dataX.length === dataHigh.length && dataX.length === dataLow.length) {
+    this.cache = this.aggregateData(dataX, dataOpen, dataHigh, dataLow, dataClose);
+  }
+}, getAggregation:function(min, max, estStep) {
+  if (!this.cache) {
+    return null;
+  }
+  var minStep = Infinity, range = this.dataX[this.dataX.length - 1] - this.dataX[0], cacheMap = this.cache.map, result = cacheMap.original, name, positions, ln, step, minIdx, maxIdx;
+  for (name in cacheMap) {
+    positions = cacheMap[name];
+    ln = positions[1] - positions[0] - 1;
+    step = range / ln;
+    if (estStep <= step && step < minStep) {
+      result = positions;
+      minStep = step;
+    }
+  }
+  minIdx = Math.max(this.binarySearchMin(this.cache, result[0], result[1], min), result[0]);
+  maxIdx = Math.min(this.binarySearchMax(this.cache, result[0], result[1], max) + 1, result[1]);
+  return {data:this.cache, start:minIdx, end:maxIdx};
+}});
+Ext.define('Ext.chart.series.sprite.Aggregative', {extend:Ext.chart.series.sprite.Cartesian, inheritableStatics:{def:{processors:{dataHigh:'data', dataLow:'data', dataClose:'data'}, aliases:{dataOpen:'dataY'}, defaults:{dataHigh:null, dataLow:null, dataClose:null}}}, config:{aggregator:{}}, applyAggregator:function(aggregator, oldAggr) {
+  return Ext.factory(aggregator, Ext.draw.SegmentTree, oldAggr);
+}, constructor:function() {
+  this.callParent(arguments);
+}, processDataY:function() {
+  var me = this, attr = me.attr, high = attr.dataHigh, low = attr.dataLow, close = attr.dataClose, open = attr.dataY, aggregator;
+  me.callParent(arguments);
+  if (attr.dataX && open && open.length > 0) {
+    aggregator = me.getAggregator();
+    if (high) {
+      aggregator.setData(attr.dataX, attr.dataY, high, low, close);
+    } else {
+      aggregator.setData(attr.dataX, attr.dataY);
+    }
+  }
+}, getGapWidth:function() {
+  return 1;
+}, renderClipped:function(surface, ctx, dataClipRect, surfaceClipRect) {
+  var me = this, min = Math.min(dataClipRect[0], dataClipRect[2]), max = Math.max(dataClipRect[0], dataClipRect[2]), aggregator = me.getAggregator(), aggregates = aggregator && aggregator.getAggregation(min, max, (max - min) / surfaceClipRect[2] * me.getGapWidth());
+  if (aggregates) {
+    me.dataStart = aggregates.data.startIdx[aggregates.start];
+    me.dataEnd = aggregates.data.endIdx[aggregates.end - 1];
+    me.renderAggregates(aggregates.data, aggregates.start, aggregates.end, surface, ctx, dataClipRect, surfaceClipRect);
+  }
+}});
+Ext.define('Ext.chart.series.sprite.CandleStick', {alias:'sprite.candlestickSeries', extend:Ext.chart.series.sprite.Aggregative, inheritableStatics:{def:{processors:{raiseStyle:function(n, o) {
+  return Ext.merge({}, o || {}, n);
+}, dropStyle:function(n, o) {
+  return Ext.merge({}, o || {}, n);
+}, barWidth:'number', padding:'number', ohlcType:'enums(candlestick,ohlc)'}, defaults:{raiseStyle:{strokeStyle:'green', fillStyle:'green'}, dropStyle:{strokeStyle:'red', fillStyle:'red'}, barWidth:15, padding:3, lineJoin:'miter', miterLimit:5, ohlcType:'candlestick'}, triggers:{raiseStyle:'raiseStyle', dropStyle:'dropStyle'}, updaters:{raiseStyle:function() {
+  var me = this, tpl = me.raiseTemplate;
+  if (tpl) {
+    tpl.setAttributes(me.attr.raiseStyle);
+  }
+}, dropStyle:function() {
+  var me = this, tpl = me.dropTemplate;
+  if (tpl) {
+    tpl.setAttributes(me.attr.dropStyle);
+  }
+}}}}, candlestick:function(ctx, open, high, low, close, mid, halfWidth) {
+  var minOC = Math.min(open, close), maxOC = Math.max(open, close);
+  ctx.moveTo(mid, low);
+  ctx.lineTo(mid, minOC);
+  ctx.moveTo(mid + halfWidth, maxOC);
+  ctx.lineTo(mid + halfWidth, minOC);
+  ctx.lineTo(mid - halfWidth, minOC);
+  ctx.lineTo(mid - halfWidth, maxOC);
+  ctx.closePath();
+  ctx.moveTo(mid, high);
+  ctx.lineTo(mid, maxOC);
+}, ohlc:function(ctx, open, high, low, close, mid, halfWidth) {
+  ctx.moveTo(mid, high);
+  ctx.lineTo(mid, low);
+  ctx.moveTo(mid, open);
+  ctx.lineTo(mid - halfWidth, open);
+  ctx.moveTo(mid, close);
+  ctx.lineTo(mid + halfWidth, close);
+}, constructor:function() {
+  var me = this, Rect = Ext.draw.sprite.Rect;
+  me.callParent(arguments);
+  me.raiseTemplate = new Rect({parent:me});
+  me.dropTemplate = new Rect({parent:me});
+}, getGapWidth:function() {
+  var attr = this.attr, barWidth = attr.barWidth, padding = attr.padding;
+  return barWidth + padding;
+}, renderAggregates:function(aggregates, start, end, surface, ctx, clip) {
+  var me = this, attr = me.attr, ohlcType = attr.ohlcType, series = me.getSeries(), matrix = attr.matrix, xx = matrix.getXX(), yy = matrix.getYY(), dx = matrix.getDX(), dy = matrix.getDY(), halfWidth = Math.round(attr.barWidth * 0.5), dataX = attr.dataX, opens = aggregates.open, closes = aggregates.close, maxYs = aggregates.maxY, minYs = aggregates.minY, startIdxs = aggregates.startIdx, pixelAdjust = attr.lineWidth * surface.devicePixelRatio / 2, renderer = attr.renderer, rendererConfig = renderer && 
+  {}, rendererParams, rendererChanges, open, high, low, close, mid, i, template;
+  me.rendererData = me.rendererData || {store:me.getStore()};
+  pixelAdjust -= Math.floor(pixelAdjust);
+  ctx.save();
+  template = me.raiseTemplate;
+  template.useAttributes(ctx, clip);
+  if (!renderer) {
+    ctx.beginPath();
+  }
+  for (i = start; i < end; i++) {
+    if (opens[i] <= closes[i]) {
+      open = Math.round(opens[i] * yy + dy) + pixelAdjust;
+      high = Math.round(maxYs[i] * yy + dy) + pixelAdjust;
+      low = Math.round(minYs[i] * yy + dy) + pixelAdjust;
+      close = Math.round(closes[i] * yy + dy) + pixelAdjust;
+      mid = Math.round(dataX[startIdxs[i]] * xx + dx) + pixelAdjust;
+      if (renderer) {
+        ctx.save();
+        ctx.beginPath();
+        rendererConfig.open = open;
+        rendererConfig.high = high;
+        rendererConfig.low = low;
+        rendererConfig.close = close;
+        rendererConfig.mid = mid;
+        rendererConfig.halfWidth = halfWidth;
+        rendererParams = [me, rendererConfig, me.rendererData, i];
+        rendererChanges = Ext.callback(renderer, null, rendererParams, 0, series);
+        Ext.apply(ctx, rendererChanges);
+      }
+      me[ohlcType](ctx, open, high, low, close, mid, halfWidth);
+      if (renderer) {
+        ctx.fillStroke(template.attr);
+        ctx.restore();
+      }
+    }
+  }
+  if (!renderer) {
+    ctx.fillStroke(template.attr);
+  }
+  ctx.restore();
+  ctx.save();
+  template = me.dropTemplate;
+  template.useAttributes(ctx, clip);
+  if (!renderer) {
+    ctx.beginPath();
+  }
+  for (i = start; i < end; i++) {
+    if (opens[i] > closes[i]) {
+      open = Math.round(opens[i] * yy + dy) + pixelAdjust;
+      high = Math.round(maxYs[i] * yy + dy) + pixelAdjust;
+      low = Math.round(minYs[i] * yy + dy) + pixelAdjust;
+      close = Math.round(closes[i] * yy + dy) + pixelAdjust;
+      mid = Math.round(dataX[startIdxs[i]] * xx + dx) + pixelAdjust;
+      if (renderer) {
+        ctx.save();
+        ctx.beginPath();
+        rendererConfig.open = open;
+        rendererConfig.high = high;
+        rendererConfig.low = low;
+        rendererConfig.close = close;
+        rendererConfig.mid = mid;
+        rendererConfig.halfWidth = halfWidth;
+        rendererParams = [me, rendererConfig, me.rendererData, i];
+        rendererChanges = Ext.callback(renderer, null, rendererParams, 0, me.getSeries());
+        Ext.apply(ctx, rendererChanges);
+      }
+      me[ohlcType](ctx, open, high, low, close, mid, halfWidth);
+      if (renderer) {
+        ctx.fillStroke(template.attr);
+        ctx.restore();
+      }
+    }
+  }
+  if (!renderer) {
+    ctx.fillStroke(template.attr);
+  }
+  ctx.restore();
+}});
+Ext.define('Ext.chart.series.CandleStick', {extend:Ext.chart.series.Cartesian, alias:'series.candlestick', type:'candlestick', seriesType:'candlestickSeries', isCandleStick:true, config:{openField:null, highField:null, lowField:null, closeField:null}, fieldCategoryY:['Open', 'High', 'Low', 'Close'], themeColorCount:function() {
+  return 2;
+}});
 Ext.define('Ext.chart.series.Polar', {extend:Ext.chart.series.Series, config:{rotation:0, radius:null, center:[0, 0], offsetX:0, offsetY:0, showInLegend:true, xField:null, yField:null, angleField:null, radiusField:null, xAxis:null, yAxis:null}, directions:['X', 'Y'], fieldCategoryX:['X'], fieldCategoryY:['Y'], deprecatedConfigs:{field:'angleField', lengthField:'radiusField'}, constructor:function(config) {
   var me = this, configurator = me.self.getConfigurator(), configs = configurator.configs, p;
   if (config) {
@@ -98982,6 +102526,580 @@ Ext.define('Ext.chart.series.Polar', {extend:Ext.chart.series.Series, config:{ro
   if (sprites && sprites[0]) {
     sprites[0].setAttributes({baseRotation:rotation});
   }
+}});
+Ext.define('Ext.chart.series.Gauge', {alias:'series.gauge', extend:Ext.chart.series.Polar, type:'gauge', seriesType:'pieslice', config:{needle:false, needleLength:90, needleWidth:4, donut:30, showInLegend:false, value:null, colors:null, sectors:null, minimum:0, maximum:100, rotation:0, totalAngle:Math.PI / 2, rect:[0, 0, 1, 1], center:[0.5, 0.75], radius:0.5, wholeDisk:false}, coordinateX:function() {
+  return this.coordinate('X', 0, 2);
+}, coordinateY:function() {
+  return this.coordinate('Y', 1, 2);
+}, updateNeedle:function(needle) {
+  var me = this, sprites = me.getSprites(), angle = me.valueToAngle(me.getValue());
+  if (sprites && sprites.length) {
+    sprites[0].setAttributes({startAngle:needle ? angle : 0, endAngle:angle, strokeOpacity:needle ? 1 : 0, lineWidth:needle ? me.getNeedleWidth() : 0});
+    me.doUpdateStyles();
+  }
+}, themeColorCount:function() {
+  var me = this, store = me.getStore(), count = store && store.getCount() || 0;
+  return count + (me.getNeedle() ? 0 : 1);
+}, updateColors:function(colors, oldColors) {
+  var me = this, sectors = me.getSectors(), sectorCount = sectors && sectors.length, sprites = me.getSprites(), newColors = Ext.Array.clone(colors), colorCount = colors && colors.length, i;
+  if (!colorCount || !colors[0]) {
+    return;
+  }
+  for (i = 0; i < sectorCount; i++) {
+    newColors[i + 1] = sectors[i].color || newColors[i + 1] || colors[i % colorCount];
+  }
+  if (sprites.length) {
+    sprites[0].setAttributes({strokeStyle:newColors[0]});
+  }
+  this.setSubStyle({fillStyle:newColors, strokeStyle:newColors});
+  this.doUpdateStyles();
+}, updateRect:function(rect) {
+  var wholeDisk = this.getWholeDisk(), halfTotalAngle = wholeDisk ? Math.PI : this.getTotalAngle() / 2, donut = this.getDonut() / 100, width, height, radius;
+  if (halfTotalAngle <= Math.PI / 2) {
+    width = 2 * Math.sin(halfTotalAngle);
+    height = 1 - donut * Math.cos(halfTotalAngle);
+  } else {
+    width = 2;
+    height = 1 - Math.cos(halfTotalAngle);
+  }
+  radius = Math.min(rect[2] / width, rect[3] / height);
+  this.setRadius(radius);
+  this.setCenter([rect[2] / 2, radius + (rect[3] - height * radius) / 2]);
+}, updateCenter:function(center) {
+  this.setStyle({centerX:center[0], centerY:center[1], rotationCenterX:center[0], rotationCenterY:center[1]});
+  this.doUpdateStyles();
+}, updateRotation:function(rotation) {
+  this.setStyle({rotationRads:rotation - (this.getTotalAngle() + Math.PI) / 2});
+  this.doUpdateStyles();
+}, doUpdateShape:function(radius, donut) {
+  var me = this, sectors = me.getSectors(), sectorCount = sectors && sectors.length || 0, needleLength = me.getNeedleLength() / 100, endRhoArray;
+  endRhoArray = [radius * needleLength, radius];
+  while (sectorCount--) {
+    endRhoArray.push(radius);
+  }
+  me.setSubStyle({endRho:endRhoArray, startRho:radius / 100 * donut});
+  me.doUpdateStyles();
+}, updateRadius:function(radius) {
+  var donut = this.getDonut();
+  this.doUpdateShape(radius, donut);
+}, updateDonut:function(donut) {
+  var radius = this.getRadius();
+  this.doUpdateShape(radius, donut);
+}, valueToAngle:function(value) {
+  value = this.applyValue(value);
+  return this.getTotalAngle() * (value - this.getMinimum()) / (this.getMaximum() - this.getMinimum());
+}, applyValue:function(value) {
+  return Math.min(this.getMaximum(), Math.max(value, this.getMinimum()));
+}, updateValue:function(value) {
+  var me = this, needle = me.getNeedle(), angle = me.valueToAngle(value), sprites = me.getSprites();
+  sprites[0].getRendererData().value = value;
+  sprites[0].setAttributes({startAngle:needle ? angle : 0, endAngle:angle});
+  me.doUpdateStyles();
+}, processData:function() {
+  var me = this, store = me.getStore(), record = store && store.first(), animation, duration, axis, min, max, xField, value;
+  if (record) {
+    xField = me.getXField();
+    if (xField) {
+      value = record.get(xField);
+    }
+  }
+  if (axis = me.getXAxis()) {
+    min = axis.getMinimum();
+    max = axis.getMaximum();
+    animation = axis.getSprites()[0].getAnimation();
+    duration = animation.getDuration();
+    animation.setDuration(0);
+    if (Ext.isNumber(min)) {
+      me.setMinimum(min);
+    } else {
+      axis.setMinimum(me.getMinimum());
+    }
+    if (Ext.isNumber(max)) {
+      me.setMaximum(max);
+    } else {
+      axis.setMaximum(me.getMaximum());
+    }
+    animation.setDuration(duration);
+  }
+  if (!Ext.isNumber(value)) {
+    value = me.getMinimum();
+  }
+  me.setValue(value);
+}, getDefaultSpriteConfig:function() {
+  return {type:this.seriesType, renderer:this.getRenderer(), animation:{customDurations:{translationX:0, translationY:0, rotationCenterX:0, rotationCenterY:0, centerX:0, centerY:0, startRho:0, endRho:0, baseRotation:0}}};
+}, normalizeSectors:function(sectors) {
+  var me = this, sectorCount = sectors && sectors.length || 0, i, value, start, end;
+  if (sectorCount) {
+    for (i = 0; i < sectorCount; i++) {
+      value = sectors[i];
+      if (typeof value === 'number') {
+        sectors[i] = {start:i > 0 ? sectors[i - 1].end : me.getMinimum(), end:Math.min(value, me.getMaximum())};
+        if (i == sectorCount - 1 && sectors[i].end < me.getMaximum()) {
+          sectors[i + 1] = {start:sectors[i].end, end:me.getMaximum()};
+        }
+      } else {
+        if (typeof value.start === 'number') {
+          start = Math.max(value.start, me.getMinimum());
+        } else {
+          start = i > 0 ? sectors[i - 1].end : me.getMinimum();
+        }
+        if (typeof value.end === 'number') {
+          end = Math.min(value.end, me.getMaximum());
+        } else {
+          end = me.getMaximum();
+        }
+        sectors[i].start = start;
+        sectors[i].end = end;
+      }
+    }
+  } else {
+    sectors = [{start:me.getMinimum(), end:me.getMaximum()}];
+  }
+  return sectors;
+}, getSprites:function() {
+  var me = this, store = me.getStore(), value = me.getValue(), label = me.getLabel(), i, ln;
+  if (!store && !Ext.isNumber(value)) {
+    return Ext.emptyArray;
+  }
+  var chart = me.getChart(), animation = me.getAnimation() || chart && chart.getAnimation(), sprites = me.sprites, spriteIndex = 0, sprite, sectors, attr, rendererData, lineWidths = [];
+  if (sprites && sprites.length) {
+    sprites[0].setAnimation(animation);
+    return sprites;
+  }
+  rendererData = {store:store, field:me.getXField(), angleField:me.getXField(), value:value, series:me};
+  me.needleSprite = sprite = me.createSprite();
+  sprite.setAttributes({zIndex:10}, true);
+  sprite.setRendererData(rendererData);
+  sprite.setRendererIndex(spriteIndex++);
+  lineWidths.push(me.getNeedleWidth());
+  if (label) {
+    label.getTemplate().setField(true);
+  }
+  sectors = me.normalizeSectors(me.getSectors());
+  for (i = 0, ln = sectors.length; i < ln; i++) {
+    attr = {startAngle:me.valueToAngle(sectors[i].start), endAngle:me.valueToAngle(sectors[i].end), label:sectors[i].label, fillStyle:sectors[i].color, strokeOpacity:0, doCallout:false, labelOverflowPadding:-1};
+    Ext.apply(attr, sectors[i].style);
+    sprite = me.createSprite();
+    sprite.setRendererData(rendererData);
+    sprite.setRendererIndex(spriteIndex++);
+    sprite.setAttributes(attr, true);
+    lineWidths.push(attr.lineWidth);
+  }
+  me.setSubStyle({lineWidth:lineWidths});
+  me.doUpdateStyles();
+  return sprites;
+}, doUpdateStyles:function() {
+  var me = this;
+  me.callParent();
+  if (me.sprites.length) {
+    me.needleSprite.setAttributes({startRho:me.getNeedle() ? 0 : me.getRadius() / 100 * me.getDonut()});
+  }
+}});
+Ext.define('Ext.chart.series.sprite.Line', {alias:'sprite.lineSeries', extend:Ext.chart.series.sprite.Aggregative, inheritableStatics:{def:{processors:{curve:'default', fillArea:'bool', nullStyle:'enums(gap,connect,origin)', preciseStroke:'bool', xAxis:'default', yCap:'default'}, defaults:{curve:{type:'linear'}, nullStyle:'connect', fillArea:false, preciseStroke:true, xAxis:null, yCap:Math.pow(2, 20), yJump:50}, triggers:{dataX:'dataX,bbox,curve', dataY:'dataY,bbox,curve', curve:'curve'}, updaters:{curve:'curveUpdater'}}}, 
+list:null, curveUpdater:function(attr) {
+  var me = this, dataX = attr.dataX, dataY = attr.dataY, curve = attr.curve, smoothable = dataX && dataY && dataX.length > 2 && dataY.length > 2, type = curve.type;
+  if (smoothable) {
+    if (type === 'natural') {
+      me.smoothX = Ext.draw.Draw.naturalSpline(dataX);
+      me.smoothY = Ext.draw.Draw.naturalSpline(dataY);
+    } else {
+      if (type === 'cardinal') {
+        me.smoothX = Ext.draw.Draw.cardinalSpline(dataX, curve.tension);
+        me.smoothY = Ext.draw.Draw.cardinalSpline(dataY, curve.tension);
+      } else {
+        smoothable = false;
+      }
+    }
+  }
+  if (!smoothable) {
+    delete me.smoothX;
+    delete me.smoothY;
+  }
+}, updatePlainBBox:function(plain) {
+  var attr = this.attr, ymin = Math.min(0, attr.dataMinY), ymax = Math.max(0, attr.dataMaxY);
+  plain.x = attr.dataMinX;
+  plain.y = ymin;
+  plain.width = attr.dataMaxX - attr.dataMinX;
+  plain.height = ymax - ymin;
+}, drawStrip:function(ctx, strip) {
+  ctx.moveTo(strip[0], strip[1]);
+  for (var i = 2, ln = strip.length; i < ln; i += 2) {
+    ctx.lineTo(strip[i], strip[i + 1]);
+  }
+}, drawStraightStroke:function(surface, ctx, start, end, list, xAxis) {
+  var me = this, attr = me.attr, nullStyle = attr.nullStyle, isConnect = nullStyle === 'connect', isOrigin = nullStyle === 'origin', renderer = attr.renderer, curve = attr.curve, step = curve.type === 'step-after', needMoveTo = true, ln = list.length, lineConfig = {type:'line', smooth:false, step:step};
+  var rendererChanges, params, stripStartX, isValidX0, isValidX, isValidX1, isValidPoint0, isValidPoint, isValidPoint1, isGap, lastValidPoint, px, py, x, y, x0, y0, x1, y1, i;
+  var strip = [];
+  ctx.beginPath();
+  for (i = 3; i < ln; i += 3) {
+    x0 = list[i - 3];
+    y0 = list[i - 2];
+    x = list[i];
+    y = list[i + 1];
+    x1 = list[i + 3];
+    y1 = list[i + 4];
+    isValidX0 = Ext.isNumber(x0);
+    isValidX = Ext.isNumber(x);
+    isValidX1 = Ext.isNumber(x1);
+    isValidPoint0 = isValidX0 && Ext.isNumber(y0);
+    isValidPoint = isValidX && Ext.isNumber(y);
+    isValidPoint1 = isValidX1 && Ext.isNumber(y1);
+    if (isOrigin) {
+      if (!isValidPoint0 && isValidX0) {
+        y0 = xAxis;
+        isValidPoint0 = true;
+      }
+      if (!isValidPoint && isValidX) {
+        y = xAxis;
+        isValidPoint = true;
+      }
+      if (!isValidPoint1 && isValidX1) {
+        y1 = xAxis;
+        isValidPoint1 = true;
+      }
+    }
+    if (renderer) {
+      lineConfig.x = x;
+      lineConfig.y = y;
+      lineConfig.x0 = x0;
+      lineConfig.y0 = y0;
+      params = [me, lineConfig, me.rendererData, start + i / 3];
+      rendererChanges = Ext.callback(renderer, null, params, 0, me.getSeries());
+    }
+    if (isGap && isConnect && isValidPoint0 && lastValidPoint) {
+      px = lastValidPoint[0];
+      py = lastValidPoint[1];
+      if (needMoveTo) {
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        strip.push(px, py);
+        stripStartX = px;
+        needMoveTo = false;
+      }
+      if (step) {
+        ctx.lineTo(x0, py);
+        strip.push(x0, py);
+      }
+      ctx.lineTo(x0, y0);
+      strip.push(x0, y0);
+      lastValidPoint = [x0, y0];
+      isGap = false;
+    }
+    if (isConnect && lastValidPoint && isValidPoint && !isValidPoint0) {
+      x0 = lastValidPoint[0];
+      y0 = lastValidPoint[1];
+      isValidPoint0 = true;
+    }
+    if (isValidPoint) {
+      lastValidPoint = [x, y];
+    }
+    if (isValidPoint0 && isValidPoint) {
+      if (needMoveTo) {
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        strip.push(x0, y0);
+        stripStartX = x0;
+        needMoveTo = false;
+      }
+    } else {
+      isGap = true;
+      continue;
+    }
+    if (step) {
+      ctx.lineTo(x, y0);
+      strip.push(x, y0);
+    }
+    ctx.lineTo(x, y);
+    strip.push(x, y);
+    if (rendererChanges || !isValidPoint1) {
+      ctx.save();
+      Ext.apply(ctx, rendererChanges);
+      rendererChanges = null;
+      if (attr.fillArea) {
+        ctx.lineTo(x, xAxis);
+        ctx.lineTo(stripStartX, xAxis);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.beginPath();
+      me.drawStrip(ctx, strip);
+      strip = [];
+      ctx.stroke();
+      ctx.restore();
+      ctx.beginPath();
+      needMoveTo = true;
+    }
+  }
+}, calculateScale:function(count, end) {
+  var power = 0, n = count;
+  while (n < end && count > 0) {
+    power++;
+    n += count >> power;
+  }
+  return Math.pow(2, power > 0 ? power - 1 : power);
+}, drawSmoothStroke:function(surface, ctx, start, end, list, xAxis) {
+  var me = this, attr = me.attr, step = attr.step, matrix = attr.matrix, renderer = attr.renderer, xx = matrix.getXX(), yy = matrix.getYY(), dx = matrix.getDX(), dy = matrix.getDY(), smoothX = me.smoothX, smoothY = me.smoothY, scale = me.calculateScale(attr.dataX.length, end), cx1, cy1, cx2, cy2, x, y, x0, y0, i, j, changes, params, lineConfig = {type:'line', smooth:true, step:step};
+  ctx.beginPath();
+  ctx.moveTo(smoothX[start * 3] * xx + dx, smoothY[start * 3] * yy + dy);
+  for (i = 0, j = start * 3 + 1; i < list.length - 3; i += 3, j += 3 * scale) {
+    cx1 = smoothX[j] * xx + dx;
+    cy1 = smoothY[j] * yy + dy;
+    cx2 = smoothX[j + 1] * xx + dx;
+    cy2 = smoothY[j + 1] * yy + dy;
+    x = surface.roundPixel(list[i + 3]);
+    y = list[i + 4];
+    x0 = surface.roundPixel(list[i]);
+    y0 = list[i + 1];
+    if (renderer) {
+      lineConfig.x0 = x0;
+      lineConfig.y0 = y0;
+      lineConfig.cx1 = cx1;
+      lineConfig.cy1 = cy1;
+      lineConfig.cx2 = cx2;
+      lineConfig.cy2 = cy2;
+      lineConfig.x = x;
+      lineConfig.y = y;
+      params = [me, lineConfig, me.rendererData, start + i / 3 + 1];
+      changes = Ext.callback(renderer, null, params, 0, me.getSeries());
+      ctx.save();
+      Ext.apply(ctx, changes);
+    }
+    if (attr.fillArea) {
+      ctx.moveTo(x0, y0);
+      ctx.bezierCurveTo(cx1, cy1, cx2, cy2, x, y);
+      ctx.lineTo(x, xAxis);
+      ctx.lineTo(x0, xAxis);
+      ctx.lineTo(x0, y0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+    }
+    ctx.moveTo(x0, y0);
+    ctx.bezierCurveTo(cx1, cy1, cx2, cy2, x, y);
+    ctx.stroke();
+    ctx.moveTo(x0, y0);
+    ctx.closePath();
+    if (renderer) {
+      ctx.restore();
+    }
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  }
+  ctx.beginPath();
+}, drawLabel:function(text, dataX, dataY, labelId, rect) {
+  var me = this, attr = me.attr, label = me.getMarker('labels'), labelTpl = label.getTemplate(), labelCfg = me.labelCfg || (me.labelCfg = {}), surfaceMatrix = me.surfaceMatrix, labelX, labelY, labelOverflowPadding = attr.labelOverflowPadding, halfHeight, labelBBox, changes, params, hasPendingChanges;
+  labelCfg.x = surfaceMatrix.x(dataX, dataY);
+  labelCfg.y = surfaceMatrix.y(dataX, dataY);
+  if (attr.flipXY) {
+    labelCfg.rotationRads = Math.PI * 0.5;
+  } else {
+    labelCfg.rotationRads = 0;
+  }
+  labelCfg.text = text;
+  if (labelTpl.attr.renderer) {
+    params = [text, label, labelCfg, me.rendererData, labelId];
+    changes = Ext.callback(labelTpl.attr.renderer, null, params, 0, me.getSeries());
+    if (typeof changes === 'string') {
+      labelCfg.text = changes;
+    } else {
+      if (typeof changes === 'object') {
+        if ('text' in changes) {
+          labelCfg.text = changes.text;
+        }
+        hasPendingChanges = true;
+      }
+    }
+  }
+  labelBBox = me.getMarkerBBox('labels', labelId, true);
+  if (!labelBBox) {
+    me.putMarker('labels', labelCfg, labelId);
+    labelBBox = me.getMarkerBBox('labels', labelId, true);
+  }
+  halfHeight = labelBBox.height / 2;
+  labelX = dataX;
+  switch(labelTpl.attr.display) {
+    case 'under':
+      labelY = dataY - halfHeight - labelOverflowPadding;
+      break;
+    case 'rotate':
+      labelX += labelOverflowPadding;
+      labelY = dataY - labelOverflowPadding;
+      labelCfg.rotationRads = -Math.PI / 4;
+      break;
+    default:
+      labelY = dataY + halfHeight + labelOverflowPadding;
+  }
+  labelCfg.x = surfaceMatrix.x(labelX, labelY);
+  labelCfg.y = surfaceMatrix.y(labelX, labelY);
+  if (hasPendingChanges) {
+    Ext.apply(labelCfg, changes);
+  }
+  me.putMarker('labels', labelCfg, labelId);
+}, drawMarker:function(x, y, index) {
+  var me = this, attr = me.attr, renderer = attr.renderer, surfaceMatrix = me.surfaceMatrix, markerCfg = {}, changes, params;
+  if (renderer && me.getMarker('markers')) {
+    markerCfg.type = 'marker';
+    markerCfg.x = x;
+    markerCfg.y = y;
+    params = [me, markerCfg, me.rendererData, index];
+    changes = Ext.callback(renderer, null, params, 0, me.getSeries());
+    if (changes) {
+      Ext.apply(markerCfg, changes);
+    }
+  }
+  markerCfg.translationX = surfaceMatrix.x(x, y);
+  markerCfg.translationY = surfaceMatrix.y(x, y);
+  delete markerCfg.x;
+  delete markerCfg.y;
+  me.putMarker('markers', markerCfg, index, !renderer);
+}, drawStroke:function(surface, ctx, start, end, list, xAxis) {
+  var me = this, isSmooth = me.smoothX && me.smoothY;
+  if (isSmooth) {
+    me.drawSmoothStroke(surface, ctx, start, end, list, xAxis);
+  } else {
+    me.drawStraightStroke(surface, ctx, start, end, list, xAxis);
+  }
+}, renderAggregates:function(aggregates, start, end, surface, ctx, clip, rect) {
+  var me = this, attr = me.attr, dataX = attr.dataX, dataY = attr.dataY, labels = attr.labels, xAxis = attr.xAxis, yCap = attr.yCap, isSmooth = attr.smooth && me.smoothX && me.smoothY, isDrawLabels = labels && me.getMarker('labels'), isDrawMarkers = me.getMarker('markers'), matrix = attr.matrix, pixel = surface.devicePixelRatio, xx = matrix.getXX(), yy = matrix.getYY(), dx = matrix.getDX(), dy = matrix.getDY(), list = me.list || (me.list = []), minXs = aggregates.minX, maxXs = aggregates.maxX, minYs = 
+  aggregates.minY, maxYs = aggregates.maxY, idx = aggregates.startIdx, isContinuousLine = true, isValidMinX, isValidMaxX, isValidMinY, isValidMaxY, xAxisOrigin, isVerticalX, x, y, i, index;
+  me.rendererData = {store:me.getStore()};
+  list.length = 0;
+  for (i = start; i < end; i++) {
+    var minX = minXs[i], maxX = maxXs[i], minY = minYs[i], maxY = maxYs[i];
+    isValidMinX = Ext.isNumber(minX);
+    isValidMinY = Ext.isNumber(minY);
+    isValidMaxX = Ext.isNumber(maxX);
+    isValidMaxY = Ext.isNumber(maxY);
+    if (minX < maxX) {
+      list.push(isValidMinX ? minX * xx + dx : null, isValidMinY ? minY * yy + dy : null, idx[i]);
+      list.push(isValidMaxX ? maxX * xx + dx : null, isValidMaxY ? maxY * yy + dy : null, idx[i]);
+    } else {
+      if (minX > maxX) {
+        list.push(isValidMaxX ? maxX * xx + dx : null, isValidMaxY ? maxY * yy + dy : null, idx[i]);
+        list.push(isValidMinX ? minX * xx + dx : null, isValidMinY ? minY * yy + dy : null, idx[i]);
+      } else {
+        list.push(isValidMaxX ? maxX * xx + dx : null, isValidMaxY ? maxY * yy + dy : null, idx[i]);
+      }
+    }
+  }
+  if (list.length) {
+    for (i = 0; i < list.length; i += 3) {
+      x = list[i];
+      y = list[i + 1];
+      if (Ext.isNumber(x) && Ext.isNumber(y)) {
+        if (y > yCap) {
+          y = yCap;
+        } else {
+          if (y < -yCap) {
+            y = -yCap;
+          }
+        }
+        list[i + 1] = y;
+      } else {
+        isContinuousLine = false;
+        continue;
+      }
+      index = list[i + 2];
+      if (isDrawMarkers) {
+        me.drawMarker(x, y, index);
+      }
+      if (isDrawLabels && labels[index]) {
+        me.drawLabel(labels[index], x, y, index, rect);
+      }
+    }
+    me.isContinuousLine = isContinuousLine;
+    if (isSmooth && !isContinuousLine) {
+      Ext.raise('Line smoothing in only supported for gapless data, ' + 'where all data points are finite numbers.');
+    }
+    if (xAxis) {
+      isVerticalX = xAxis.getAlignment() === 'vertical';
+      if (Ext.isNumber(xAxis.floatingAtCoord)) {
+        xAxisOrigin = (isVerticalX ? rect[2] : rect[3]) - xAxis.floatingAtCoord;
+      } else {
+        xAxisOrigin = isVerticalX ? rect[0] : rect[1];
+      }
+    } else {
+      xAxisOrigin = attr.flipXY ? rect[0] : rect[1];
+    }
+    if (attr.preciseStroke) {
+      if (attr.fillArea) {
+        ctx.fill();
+      }
+      if (attr.transformFillStroke) {
+        attr.inverseMatrix.toContext(ctx);
+      }
+      me.drawStroke(surface, ctx, start, end, list, xAxisOrigin);
+      if (attr.transformFillStroke) {
+        attr.matrix.toContext(ctx);
+      }
+      ctx.stroke();
+    } else {
+      me.drawStroke(surface, ctx, start, end, list, xAxisOrigin);
+      if (isContinuousLine && isSmooth && attr.fillArea && !attr.renderer) {
+        var lastPointX = dataX[dataX.length - 1] * xx + dx + pixel, lastPointY = dataY[dataY.length - 1] * yy + dy, firstPointX = dataX[0] * xx + dx - pixel, firstPointY = dataY[0] * yy + dy;
+        ctx.lineTo(lastPointX, lastPointY);
+        ctx.lineTo(lastPointX, xAxisOrigin - attr.lineWidth);
+        ctx.lineTo(firstPointX, xAxisOrigin - attr.lineWidth);
+        ctx.lineTo(firstPointX, firstPointY);
+      }
+      if (attr.transformFillStroke) {
+        attr.matrix.toContext(ctx);
+      }
+      if (attr.fillArea) {
+        ctx.fillStroke(attr, true);
+      } else {
+        ctx.stroke(true);
+      }
+    }
+  }
+}});
+Ext.define('Ext.chart.series.Line', {extend:Ext.chart.series.Cartesian, alias:'series.line', type:'line', seriesType:'lineSeries', isLine:true, config:{selectionTolerance:20, curve:{type:'linear'}, smooth:null, step:null, nullStyle:'gap', fill:undefined, aggregator:{strategy:'double'}}, themeMarkerCount:function() {
+  return 1;
+}, getDefaultSpriteConfig:function() {
+  var me = this, parentConfig = me.callParent(arguments), style = Ext.apply({}, me.getStyle()), styleWithTheme, fillArea = false;
+  if (me.config.fill !== undefined) {
+    if (me.config.fill) {
+      fillArea = true;
+      if (style.fillStyle === undefined) {
+        if (style.strokeStyle === undefined) {
+          styleWithTheme = me.getStyleWithTheme();
+          style.fillStyle = styleWithTheme.fillStyle;
+          style.strokeStyle = styleWithTheme.strokeStyle;
+        } else {
+          style.fillStyle = style.strokeStyle;
+        }
+      }
+    }
+  } else {
+    if (style.fillStyle) {
+      fillArea = true;
+    }
+  }
+  if (!fillArea) {
+    delete style.fillStyle;
+  }
+  style = Ext.apply(parentConfig || {}, style);
+  return Ext.apply(style, {fillArea:fillArea, selectionTolerance:me.config.selectionTolerance});
+}, updateFill:function(fill) {
+  this.withSprite(function(sprite) {
+    return sprite.setAttributes({fillArea:fill});
+  });
+}, updateCurve:function(curve) {
+  this.withSprite(function(sprite) {
+    return sprite.setAttributes({curve:curve});
+  });
+}, getCurve:function() {
+  return this.withSprite(function(sprite) {
+    return sprite.attr.curve;
+  });
+}, updateNullStyle:function(nullStyle) {
+  this.withSprite(function(sprite) {
+    return sprite.setAttributes({nullStyle:nullStyle});
+  });
+}, updateSmooth:function(smooth) {
+  this.setCurve({type:smooth ? 'natural' : 'linear'});
+}, updateStep:function(step) {
+  this.setCurve({type:step ? 'step-after' : 'linear'});
 }});
 Ext.define('Ext.chart.series.sprite.PieSlice', {extend:Ext.draw.sprite.Sector, mixins:{markerHolder:Ext.chart.MarkerHolder}, alias:'sprite.pieslice', inheritableStatics:{def:{processors:{doCallout:'bool', label:'string', rotateLabels:'bool', labelOverflowPadding:'number', renderer:'default'}, defaults:{doCallout:true, rotateLabels:true, label:'', labelOverflowPadding:10, renderer:null}}}, config:{rendererData:null, rendererIndex:0, series:null}, setGradientBBox:function(ctx, rect) {
   var me = this, attr = me.attr, hasGradients = attr.fillStyle && attr.fillStyle.isGradient || attr.strokeStyle && attr.strokeStyle.isGradient;
@@ -99293,6 +103411,863 @@ Ext.define('Ext.chart.series.Pie', {extend:Ext.chart.series.Polar, type:'pie', a
     }
   }
 }});
+Ext.define('Ext.chart.series.sprite.Pie3DPart', {extend:Ext.draw.sprite.Path, mixins:{markerHolder:Ext.chart.MarkerHolder}, alias:'sprite.pie3dPart', inheritableStatics:{def:{processors:{centerX:'number', centerY:'number', startAngle:'number', endAngle:'number', startRho:'number', endRho:'number', margin:'number', thickness:'number', bevelWidth:'number', distortion:'number', baseColor:'color', colorSpread:'number', baseRotation:'number', part:'enums(top,bottom,start,end,innerFront,innerBack,outerFront,outerBack)', 
+label:'string'}, aliases:{rho:'endRho'}, triggers:{centerX:'path,bbox', centerY:'path,bbox', startAngle:'path,partZIndex', endAngle:'path,partZIndex', startRho:'path', endRho:'path,bbox', margin:'path,bbox', thickness:'path', distortion:'path', baseRotation:'path,partZIndex', baseColor:'partZIndex,partColor', colorSpread:'partColor', part:'path,partZIndex', globalAlpha:'canvas,alpha', fillOpacity:'canvas,alpha'}, defaults:{centerX:0, centerY:0, startAngle:Math.PI * 2, endAngle:Math.PI * 2, startRho:0, 
+endRho:150, margin:0, thickness:35, distortion:0.5, baseRotation:0, baseColor:'white', colorSpread:0.5, miterLimit:1, bevelWidth:5, strokeOpacity:0, part:'top', label:''}, updaters:{alpha:'alphaUpdater', partColor:'partColorUpdater', partZIndex:'partZIndexUpdater'}}}, config:{renderer:null, rendererData:null, rendererIndex:0, series:null}, bevelParams:[], constructor:function(config) {
+  this.callParent([config]);
+  this.bevelGradient = new Ext.draw.gradient.Linear({stops:[{offset:0, color:'rgba(255,255,255,0)'}, {offset:0.7, color:'rgba(255,255,255,0.6)'}, {offset:1, color:'rgba(255,255,255,0)'}]});
+}, updateRenderer:function() {
+  this.setDirty(true);
+}, updateRendererData:function() {
+  this.setDirty(true);
+}, updateRendererIndex:function() {
+  this.setDirty(true);
+}, alphaUpdater:function(attr) {
+  var me = this, opacity = attr.globalAlpha, fillOpacity = attr.fillOpacity, oldOpacity = me.oldOpacity, oldFillOpacity = me.oldFillOpacity;
+  if (opacity !== oldOpacity && (opacity === 1 || oldOpacity === 1) || fillOpacity !== oldFillOpacity && (fillOpacity === 1 || oldFillOpacity === 1)) {
+    me.scheduleUpdater(attr, 'path', ['globalAlpha']);
+    me.oldOpacity = opacity;
+    me.oldFillOpacity = fillOpacity;
+  }
+}, partColorUpdater:function(attr) {
+  var color = Ext.util.Color.fly(attr.baseColor), colorString = color.toString(), colorSpread = attr.colorSpread, fillStyle;
+  switch(attr.part) {
+    case 'top':
+      fillStyle = new Ext.draw.gradient.Radial({start:{x:0, y:0, r:0}, end:{x:0, y:0, r:1}, stops:[{offset:0, color:color.createLighter(0.1 * colorSpread)}, {offset:1, color:color.createDarker(0.1 * colorSpread)}]});
+      break;
+    case 'bottom':
+      fillStyle = new Ext.draw.gradient.Radial({start:{x:0, y:0, r:0}, end:{x:0, y:0, r:1}, stops:[{offset:0, color:color.createDarker(0.2 * colorSpread)}, {offset:1, color:color.toString()}]});
+      break;
+    case 'outerFront':
+    case 'outerBack':
+      fillStyle = new Ext.draw.gradient.Linear({stops:[{offset:0, color:color.createDarker(0.15 * colorSpread).toString()}, {offset:0.3, color:colorString}, {offset:0.8, color:color.createLighter(0.2 * colorSpread).toString()}, {offset:1, color:color.createDarker(0.25 * colorSpread).toString()}]});
+      break;
+    case 'start':
+      fillStyle = new Ext.draw.gradient.Linear({stops:[{offset:0, color:color.createDarker(0.1 * colorSpread).toString()}, {offset:1, color:color.createLighter(0.2 * colorSpread).toString()}]});
+      break;
+    case 'end':
+      fillStyle = new Ext.draw.gradient.Linear({stops:[{offset:0, color:color.createDarker(0.1 * colorSpread).toString()}, {offset:1, color:color.createLighter(0.2 * colorSpread).toString()}]});
+      break;
+    case 'innerFront':
+    case 'innerBack':
+      fillStyle = new Ext.draw.gradient.Linear({stops:[{offset:0, color:color.createDarker(0.1 * colorSpread).toString()}, {offset:0.2, color:color.createLighter(0.2 * colorSpread).toString()}, {offset:0.7, color:colorString}, {offset:1, color:color.createDarker(0.1 * colorSpread).toString()}]});
+      break;
+  }
+  attr.fillStyle = fillStyle;
+  attr.canvasAttributes.fillStyle = fillStyle;
+}, partZIndexUpdater:function(attr) {
+  var normalize = Ext.draw.sprite.AttributeParser.angle, rotation = attr.baseRotation, startAngle = attr.startAngle, endAngle = attr.endAngle, depth;
+  switch(attr.part) {
+    case 'top':
+      attr.zIndex = 6;
+      break;
+    case 'outerFront':
+      startAngle = normalize(startAngle + rotation);
+      endAngle = normalize(endAngle + rotation);
+      if (startAngle >= 0 && endAngle < 0) {
+        depth = Math.sin(startAngle);
+      } else {
+        if (startAngle <= 0 && endAngle > 0) {
+          depth = Math.sin(endAngle);
+        } else {
+          if (startAngle >= 0 && endAngle > 0) {
+            if (startAngle > endAngle) {
+              depth = 0;
+            } else {
+              depth = Math.max(Math.sin(startAngle), Math.sin(endAngle));
+            }
+          } else {
+            depth = 1;
+          }
+        }
+      }
+      attr.zIndex = 4 + depth;
+      break;
+    case 'outerBack':
+      attr.zIndex = 1;
+      break;
+    case 'start':
+      attr.zIndex = 4 + Math.sin(normalize(startAngle + rotation));
+      break;
+    case 'end':
+      attr.zIndex = 4 + Math.sin(normalize(endAngle + rotation));
+      break;
+    case 'innerFront':
+      attr.zIndex = 2;
+      break;
+    case 'innerBack':
+      attr.zIndex = 4 + Math.sin(normalize((startAngle + endAngle) / 2 + rotation));
+      break;
+    case 'bottom':
+      attr.zIndex = 0;
+      break;
+  }
+  attr.dirtyZIndex = true;
+}, updatePlainBBox:function(plain) {
+  var attr = this.attr, part = attr.part, baseRotation = attr.baseRotation, centerX = attr.centerX, centerY = attr.centerY, rho, angle, x, y, sin, cos;
+  if (part === 'start') {
+    angle = attr.startAngle + baseRotation;
+  } else {
+    if (part === 'end') {
+      angle = attr.endAngle + baseRotation;
+    }
+  }
+  if (Ext.isNumber(angle)) {
+    sin = Math.sin(angle);
+    cos = Math.cos(angle);
+    x = Math.min(centerX + cos * attr.startRho, centerX + cos * attr.endRho);
+    y = centerY + sin * attr.startRho * attr.distortion;
+    plain.x = x;
+    plain.y = y;
+    plain.width = cos * (attr.endRho - attr.startRho);
+    plain.height = attr.thickness + sin * (attr.endRho - attr.startRho) * 2;
+    return;
+  }
+  if (part === 'innerFront' || part === 'innerBack') {
+    rho = attr.startRho;
+  } else {
+    rho = attr.endRho;
+  }
+  plain.width = rho * 2;
+  plain.height = rho * attr.distortion * 2 + attr.thickness;
+  plain.x = attr.centerX - rho;
+  plain.y = attr.centerY - rho * attr.distortion;
+}, updateTransformedBBox:function(transform) {
+  if (this.attr.part === 'start' || this.attr.part === 'end') {
+    return this.callParent(arguments);
+  }
+  return this.updatePlainBBox(transform);
+}, updatePath:function(path) {
+  if (!this.attr.globalAlpha) {
+    return;
+  }
+  if (this.attr.endAngle < this.attr.startAngle) {
+    return;
+  }
+  this[this.attr.part + 'Renderer'](path);
+}, render:function(surface, ctx, rect) {
+  var me = this, renderer = me.getRenderer(), attr = me.attr, part = attr.part, itemCfg, changes;
+  if (!attr.globalAlpha || Ext.Number.isEqual(attr.startAngle, attr.endAngle, 1.0E-8)) {
+    return;
+  }
+  if (renderer) {
+    itemCfg = {type:'pie3dPart', part:attr.part, margin:attr.margin, distortion:attr.distortion, centerX:attr.centerX, centerY:attr.centerY, baseRotation:attr.baseRotation, startAngle:attr.startAngle, endAngle:attr.endAngle, startRho:attr.startRho, endRho:attr.endRho};
+    changes = Ext.callback(renderer, null, [me, itemCfg, me.getRendererData(), me.getRendererIndex()], 0, me.getSeries());
+    if (changes) {
+      if (changes.part) {
+        changes.part = part;
+      }
+      me.setAttributes(changes);
+      me.useAttributes(ctx, rect);
+    }
+  }
+  me.callParent([surface, ctx]);
+  me.bevelRenderer(surface, ctx);
+  if (attr.label && me.getMarker('labels')) {
+    me.placeLabel();
+  }
+}, placeLabel:function() {
+  var me = this, attr = me.attr, attributeId = attr.attributeId, margin = attr.margin, distortion = attr.distortion, centerX = attr.centerX, centerY = attr.centerY, baseRotation = attr.baseRotation, startAngle = attr.startAngle + baseRotation, endAngle = attr.endAngle + baseRotation, midAngle = (startAngle + endAngle) / 2, startRho = attr.startRho + margin, endRho = attr.endRho + margin, midRho = (startRho + endRho) / 2, sin = Math.sin(midAngle), cos = Math.cos(midAngle), surfaceMatrix = me.surfaceMatrix, 
+  label = me.getMarker('labels'), labelTpl = label.getTemplate(), calloutLine = labelTpl.getCalloutLine(), calloutLineLength = calloutLine && calloutLine.length || 40, labelCfg = {}, rendererParams, rendererChanges, x, y;
+  surfaceMatrix.appendMatrix(attr.matrix);
+  labelCfg.text = attr.label;
+  x = centerX + cos * midRho;
+  y = centerY + sin * midRho * distortion;
+  labelCfg.x = surfaceMatrix.x(x, y);
+  labelCfg.y = surfaceMatrix.y(x, y);
+  x = centerX + cos * endRho;
+  y = centerY + sin * endRho * distortion;
+  labelCfg.calloutStartX = surfaceMatrix.x(x, y);
+  labelCfg.calloutStartY = surfaceMatrix.y(x, y);
+  x = centerX + cos * (endRho + calloutLineLength);
+  y = centerY + sin * (endRho + calloutLineLength) * distortion;
+  labelCfg.calloutPlaceX = surfaceMatrix.x(x, y);
+  labelCfg.calloutPlaceY = surfaceMatrix.y(x, y);
+  labelCfg.calloutWidth = 2;
+  if (labelTpl.attr.renderer) {
+    rendererParams = [me.attr.label, label, labelCfg, me.getRendererData(), me.getRendererIndex()];
+    rendererChanges = Ext.callback(labelTpl.attr.renderer, null, rendererParams, 0, me.getSeries());
+    if (typeof rendererChanges === 'string') {
+      labelCfg.text = rendererChanges;
+    } else {
+      Ext.apply(labelCfg, rendererChanges);
+    }
+  }
+  me.putMarker('labels', labelCfg, attributeId);
+  me.putMarker('labels', {callout:1}, attributeId);
+}, bevelRenderer:function(surface, ctx) {
+  var me = this, attr = me.attr, bevelWidth = attr.bevelWidth, params = me.bevelParams, i;
+  for (i = 0; i < params.length; i++) {
+    ctx.beginPath();
+    ctx.ellipse.apply(ctx, params[i]);
+    ctx.save();
+    ctx.lineWidth = bevelWidth;
+    ctx.strokeOpacity = bevelWidth ? 1 : 0;
+    ctx.strokeGradient = me.bevelGradient;
+    ctx.stroke(attr);
+    ctx.restore();
+  }
+}, lidRenderer:function(path, thickness) {
+  var attr = this.attr, margin = attr.margin, distortion = attr.distortion, centerX = attr.centerX, centerY = attr.centerY, baseRotation = attr.baseRotation, startAngle = attr.startAngle + baseRotation, endAngle = attr.endAngle + baseRotation, midAngle = (startAngle + endAngle) / 2, startRho = attr.startRho, endRho = attr.endRho, sinEnd = Math.sin(endAngle), cosEnd = Math.cos(endAngle);
+  centerX += Math.cos(midAngle) * margin;
+  centerY += Math.sin(midAngle) * margin * distortion;
+  path.ellipse(centerX, centerY + thickness, startRho, startRho * distortion, 0, startAngle, endAngle, false);
+  path.lineTo(centerX + cosEnd * endRho, centerY + thickness + sinEnd * endRho * distortion);
+  path.ellipse(centerX, centerY + thickness, endRho, endRho * distortion, 0, endAngle, startAngle, true);
+  path.closePath();
+}, topRenderer:function(path) {
+  this.lidRenderer(path, 0);
+}, bottomRenderer:function(path) {
+  var attr = this.attr, none = Ext.util.Color.RGBA_NONE;
+  if (attr.globalAlpha < 1 || attr.fillOpacity < 1 || attr.shadowColor !== none) {
+    this.lidRenderer(path, attr.thickness);
+  }
+}, sideRenderer:function(path, position) {
+  var attr = this.attr, margin = attr.margin, centerX = attr.centerX, centerY = attr.centerY, distortion = attr.distortion, baseRotation = attr.baseRotation, startAngle = attr.startAngle + baseRotation, endAngle = attr.endAngle + baseRotation, isFullPie = !attr.startAngle && Ext.Number.isEqual(Math.PI * 2, attr.endAngle, 1.0E-7), thickness = attr.thickness, startRho = attr.startRho, endRho = attr.endRho, angle = position === 'start' && startAngle || position === 'end' && endAngle, sin = Math.sin(angle), 
+  cos = Math.cos(angle), isTranslucent = attr.globalAlpha < 1, isVisible = position === 'start' && cos < 0 || position === 'end' && cos > 0 || isTranslucent, midAngle;
+  if (isVisible && !isFullPie) {
+    midAngle = (startAngle + endAngle) / 2;
+    centerX += Math.cos(midAngle) * margin;
+    centerY += Math.sin(midAngle) * margin * distortion;
+    path.moveTo(centerX + cos * startRho, centerY + sin * startRho * distortion);
+    path.lineTo(centerX + cos * endRho, centerY + sin * endRho * distortion);
+    path.lineTo(centerX + cos * endRho, centerY + sin * endRho * distortion + thickness);
+    path.lineTo(centerX + cos * startRho, centerY + sin * startRho * distortion + thickness);
+    path.closePath();
+  }
+}, startRenderer:function(path) {
+  this.sideRenderer(path, 'start');
+}, endRenderer:function(path) {
+  this.sideRenderer(path, 'end');
+}, rimRenderer:function(path, radius, isDonut, isFront) {
+  var me = this, attr = me.attr, margin = attr.margin, centerX = attr.centerX, centerY = attr.centerY, distortion = attr.distortion, baseRotation = attr.baseRotation, normalize = Ext.draw.sprite.AttributeParser.angle, startAngle = attr.startAngle + baseRotation, endAngle = attr.endAngle + baseRotation, midAngle = normalize((startAngle + endAngle) / 2), thickness = attr.thickness, isTranslucent = attr.globalAlpha < 1, isAllFront, isAllBack, params;
+  me.bevelParams = [];
+  startAngle = normalize(startAngle);
+  endAngle = normalize(endAngle);
+  centerX += Math.cos(midAngle) * margin;
+  centerY += Math.sin(midAngle) * margin * distortion;
+  isAllFront = startAngle >= 0 && endAngle >= 0;
+  isAllBack = startAngle <= 0 && endAngle <= 0;
+  function renderLeftFrontChunk() {
+    path.ellipse(centerX, centerY + thickness, radius, radius * distortion, 0, Math.PI, startAngle, true);
+    path.lineTo(centerX + Math.cos(startAngle) * radius, centerY + Math.sin(startAngle) * radius * distortion);
+    params = [centerX, centerY, radius, radius * distortion, 0, startAngle, Math.PI, false];
+    if (!isDonut) {
+      me.bevelParams.push(params);
+    }
+    path.ellipse.apply(path, params);
+    path.closePath();
+  }
+  function renderRightFrontChunk() {
+    path.ellipse(centerX, centerY + thickness, radius, radius * distortion, 0, 0, endAngle, false);
+    path.lineTo(centerX + Math.cos(endAngle) * radius, centerY + Math.sin(endAngle) * radius * distortion);
+    params = [centerX, centerY, radius, radius * distortion, 0, endAngle, 0, true];
+    if (!isDonut) {
+      me.bevelParams.push(params);
+    }
+    path.ellipse.apply(path, params);
+    path.closePath();
+  }
+  function renderLeftBackChunk() {
+    path.ellipse(centerX, centerY + thickness, radius, radius * distortion, 0, Math.PI, endAngle, false);
+    path.lineTo(centerX + Math.cos(endAngle) * radius, centerY + Math.sin(endAngle) * radius * distortion);
+    params = [centerX, centerY, radius, radius * distortion, 0, endAngle, Math.PI, true];
+    if (isDonut) {
+      me.bevelParams.push(params);
+    }
+    path.ellipse.apply(path, params);
+    path.closePath();
+  }
+  function renderRightBackChunk() {
+    path.ellipse(centerX, centerY + thickness, radius, radius * distortion, 0, startAngle, 0, false);
+    path.lineTo(centerX + radius, centerY);
+    params = [centerX, centerY, radius, radius * distortion, 0, 0, startAngle, true];
+    if (isDonut) {
+      me.bevelParams.push(params);
+    }
+    path.ellipse.apply(path, params);
+    path.closePath();
+  }
+  if (isFront) {
+    if (!isDonut || isTranslucent) {
+      if (startAngle >= 0 && endAngle < 0) {
+        renderLeftFrontChunk();
+      } else {
+        if (startAngle <= 0 && endAngle > 0) {
+          renderRightFrontChunk();
+        } else {
+          if (startAngle <= 0 && endAngle < 0) {
+            if (startAngle > endAngle) {
+              path.ellipse(centerX, centerY + thickness, radius, radius * distortion, 0, 0, Math.PI, false);
+              path.lineTo(centerX - radius, centerY);
+              params = [centerX, centerY, radius, radius * distortion, 0, Math.PI, 0, true];
+              if (!isDonut) {
+                me.bevelParams.push(params);
+              }
+              path.ellipse.apply(path, params);
+              path.closePath();
+            }
+          } else {
+            if (startAngle > endAngle) {
+              renderLeftFrontChunk();
+              renderRightFrontChunk();
+            } else {
+              params = [centerX, centerY, radius, radius * distortion, 0, startAngle, endAngle, false];
+              if (isAllFront && !isDonut || isAllBack && isDonut) {
+                me.bevelParams.push(params);
+              }
+              path.ellipse.apply(path, params);
+              path.lineTo(centerX + Math.cos(endAngle) * radius, centerY + Math.sin(endAngle) * radius * distortion + thickness);
+              path.ellipse(centerX, centerY + thickness, radius, radius * distortion, 0, endAngle, startAngle, true);
+              path.closePath();
+            }
+          }
+        }
+      }
+    }
+  } else {
+    if (isDonut || isTranslucent) {
+      if (startAngle >= 0 && endAngle < 0) {
+        renderLeftBackChunk();
+      } else {
+        if (startAngle <= 0 && endAngle > 0) {
+          renderRightBackChunk();
+        } else {
+          if (startAngle <= 0 && endAngle < 0) {
+            if (startAngle > endAngle) {
+              renderLeftBackChunk();
+              renderRightBackChunk();
+            } else {
+              path.ellipse(centerX, centerY + thickness, radius, radius * distortion, 0, startAngle, endAngle, false);
+              path.lineTo(centerX + Math.cos(endAngle) * radius, centerY + Math.sin(endAngle) * radius * distortion);
+              params = [centerX, centerY, radius, radius * distortion, 0, endAngle, startAngle, true];
+              if (isDonut) {
+                me.bevelParams.push(params);
+              }
+              path.ellipse.apply(path, params);
+              path.closePath();
+            }
+          } else {
+            if (startAngle > endAngle) {
+              path.ellipse(centerX, centerY + thickness, radius, radius * distortion, 0, -Math.PI, 0, false);
+              path.lineTo(centerX + radius, centerY);
+              params = [centerX, centerY, radius, radius * distortion, 0, 0, -Math.PI, true];
+              if (isDonut) {
+                me.bevelParams.push(params);
+              }
+              path.ellipse.apply(path, params);
+              path.closePath();
+            }
+          }
+        }
+      }
+    }
+  }
+}, innerFrontRenderer:function(path) {
+  this.rimRenderer(path, this.attr.startRho, true, true);
+}, innerBackRenderer:function(path) {
+  this.rimRenderer(path, this.attr.startRho, true, false);
+}, outerFrontRenderer:function(path) {
+  this.rimRenderer(path, this.attr.endRho, false, true);
+}, outerBackRenderer:function(path) {
+  this.rimRenderer(path, this.attr.endRho, false, false);
+}});
+Ext.define('Ext.chart.series.Pie3D', {extend:Ext.chart.series.Polar, type:'pie3d', seriesType:'pie3d', alias:'series.pie3d', is3D:true, config:{rect:[0, 0, 0, 0], thickness:35, distortion:0.5, donut:0, hidden:[], highlightCfg:{margin:20}, shadow:false}, rotationOffset:-Math.PI / 2, setField:function(value) {
+  return this.setXField(value);
+}, getField:function() {
+  return this.getXField();
+}, updateRotation:function(rotation) {
+  var attributes = {baseRotation:rotation + this.rotationOffset};
+  this.forEachSprite(function(sprite) {
+    sprite.setAttributes(attributes);
+  });
+}, updateColors:function(colors) {
+  this.setSubStyle({baseColor:colors});
+  if (!this.isConfiguring) {
+    var chart = this.getChart();
+    if (chart) {
+      chart.refreshLegendStore();
+    }
+  }
+}, applyShadow:function(shadow) {
+  if (shadow === true) {
+    shadow = {shadowColor:'rgba(0,0,0,0.8)', shadowBlur:30};
+  } else {
+    if (!Ext.isObject(shadow)) {
+      shadow = {shadowColor:Ext.util.Color.RGBA_NONE};
+    }
+  }
+  return shadow;
+}, updateShadow:function(shadow) {
+  var me = this, sprites = me.getSprites(), spritesPerSlice = me.spritesPerSlice, ln = sprites && sprites.length, i, sprite;
+  for (i = 1; i < ln; i += spritesPerSlice) {
+    sprite = sprites[i];
+    if (sprite.attr.part = 'bottom') {
+      sprite.setAttributes(shadow);
+    }
+  }
+}, getStyleByIndex:function(i) {
+  var indexStyle = this.callParent([i]), style = this.getStyle(), fillStyle = indexStyle.fillStyle || indexStyle.fill || indexStyle.color, strokeStyle = style.strokeStyle || style.stroke;
+  if (fillStyle) {
+    indexStyle.baseColor = fillStyle;
+    delete indexStyle.fillStyle;
+    delete indexStyle.fill;
+    delete indexStyle.color;
+  }
+  if (strokeStyle) {
+    indexStyle.strokeStyle = strokeStyle;
+  }
+  return indexStyle;
+}, doUpdateStyles:function() {
+  var me = this, sprites = me.getSprites(), spritesPerSlice = me.spritesPerSlice, ln = sprites && sprites.length, i = 0, j = 0, k, style;
+  for (; i < ln; i += spritesPerSlice, j++) {
+    style = me.getStyleByIndex(j);
+    for (k = 0; k < spritesPerSlice; k++) {
+      sprites[i + k].setAttributes(style);
+    }
+  }
+}, coordinateX:function() {
+  var me = this, store = me.getStore(), records = store.getData().items, recordCount = records.length, xField = me.getXField(), animation = me.getAnimation(), rotation = me.getRotation(), hidden = me.getHidden(), sprites = me.getSprites(true), spriteCount = sprites.length, spritesPerSlice = me.spritesPerSlice, center = me.getCenter(), offsetX = me.getOffsetX(), offsetY = me.getOffsetY(), radius = me.getRadius(), thickness = me.getThickness(), distortion = me.getDistortion(), renderer = me.getRenderer(), 
+  rendererData = me.getRendererData(), highlight = me.getHighlight(), lastAngle = 0, twoPi = Math.PI * 2, delta = 1.0E-10, endAngles = [], sum = 0, value, unit, sprite, style, i, j;
+  for (i = 0; i < recordCount; i++) {
+    value = Math.abs(+records[i].get(xField)) || 0;
+    if (!hidden[i]) {
+      sum += value;
+    }
+    endAngles[i] = sum;
+    if (i >= hidden.length) {
+      hidden[i] = false;
+    }
+  }
+  if (sum === 0) {
+    return;
+  }
+  unit = 2 * Math.PI / sum;
+  for (i = 0; i < recordCount; i++) {
+    endAngles[i] *= unit;
+  }
+  for (i = 0; i < recordCount; i++) {
+    style = this.getStyleByIndex(i);
+    for (j = 0; j < spritesPerSlice; j++) {
+      sprite = sprites[i * spritesPerSlice + j];
+      sprite.setAnimation(animation);
+      sprite.setAttributes({centerX:center[0] + offsetX, centerY:center[1] + offsetY - thickness / 2, endRho:radius, startRho:radius * me.getDonut() / 100, baseRotation:rotation + me.rotationOffset, startAngle:lastAngle, endAngle:endAngles[i] - delta, thickness:thickness, distortion:distortion, globalAlpha:1});
+      sprite.setAttributes(style);
+      sprite.setConfig({renderer:renderer, rendererData:rendererData, rendererIndex:i});
+    }
+    lastAngle = endAngles[i];
+  }
+  for (i *= spritesPerSlice; i < spriteCount; i++) {
+    sprite = sprites[i];
+    sprite.setAnimation(animation);
+    sprite.setAttributes({startAngle:twoPi, endAngle:twoPi, globalAlpha:0, baseRotation:rotation + me.rotationOffset});
+  }
+}, updateHighlight:function(highlight, oldHighlight) {
+  this.callParent([highlight, oldHighlight]);
+  this.forEachSprite(function(sprite) {
+    if (highlight) {
+      if (sprite.modifiers.highlight) {
+        sprite.modifiers.highlight.setConfig(highlight);
+      } else {
+        sprite.config.highlight = highlight;
+        sprite.addModifier(highlight, true);
+      }
+    }
+  });
+}, updateLabelData:function() {
+  var me = this, store = me.getStore(), items = store.getData().items, sprites = me.getSprites(), label = me.getLabel(), labelField = label && label.getTemplate().getField(), hidden = me.getHidden(), spritesPerSlice = me.spritesPerSlice, ln, labels, sprite, name = 'labels', i, j;
+  if (sprites.length) {
+    if (labelField) {
+      labels = [];
+      for (j = 0, ln = items.length; j < ln; j++) {
+        labels.push(items[j].get(labelField));
+      }
+    }
+    for (i = 0, j = 0, ln = sprites.length; i < ln; i += spritesPerSlice, j++) {
+      sprite = sprites[i];
+      if (label) {
+        if (!sprite.getMarker(name)) {
+          sprite.bindMarker(name, label);
+        }
+        if (labels) {
+          sprite.setAttributes({label:labels[j]});
+        }
+        sprite.putMarker(name, {hidden:hidden[j]}, sprite.attr.attributeId);
+      } else {
+        sprite.releaseMarker(name);
+      }
+    }
+  }
+}, applyRadius:function() {
+  var me = this, chart = me.getChart(), padding = chart.getInnerPadding(), rect = chart.getMainRect() || [0, 0, 1, 1], width = rect[2] - padding * 2, height = rect[3] - padding * 2 - me.getThickness(), horizontalRadius = width / 2, verticalRadius = horizontalRadius * me.getDistortion(), result;
+  if (verticalRadius > height / 2) {
+    result = height / (me.getDistortion() * 2);
+  } else {
+    result = horizontalRadius;
+  }
+  return Math.max(result, 0);
+}, forEachSprite:function(fn) {
+  var sprites = this.sprites, ln = sprites.length, i;
+  for (i = 0; i < ln; i++) {
+    fn(sprites[i], Math.floor(i / this.spritesPerSlice));
+  }
+}, updateRadius:function(radius) {
+  this.getChart();
+  var donut = this.getDonut();
+  this.forEachSprite(function(sprite) {
+    sprite.setAttributes({endRho:radius, startRho:radius * donut / 100});
+  });
+}, updateDonut:function(donut) {
+  this.getChart();
+  var radius = this.getRadius();
+  this.forEachSprite(function(sprite) {
+    sprite.setAttributes({startRho:radius * donut / 100});
+  });
+}, updateCenter:function(center) {
+  this.getChart();
+  var offsetX = this.getOffsetX(), offsetY = this.getOffsetY(), thickness = this.getThickness();
+  this.forEachSprite(function(sprite) {
+    sprite.setAttributes({centerX:center[0] + offsetX, centerY:center[1] + offsetY - thickness / 2});
+  });
+}, updateThickness:function(thickness) {
+  this.getChart();
+  this.setRadius();
+  var center = this.getCenter(), offsetY = this.getOffsetY();
+  this.forEachSprite(function(sprite) {
+    sprite.setAttributes({thickness:thickness, centerY:center[1] + offsetY - thickness / 2});
+  });
+}, updateDistortion:function(distortion) {
+  this.getChart();
+  this.setRadius();
+  this.forEachSprite(function(sprite) {
+    sprite.setAttributes({distortion:distortion});
+  });
+}, updateOffsetX:function(offsetX) {
+  this.getChart();
+  var center = this.getCenter();
+  this.forEachSprite(function(sprite) {
+    sprite.setAttributes({centerX:center[0] + offsetX});
+  });
+}, updateOffsetY:function(offsetY) {
+  this.getChart();
+  var center = this.getCenter(), thickness = this.getThickness();
+  this.forEachSprite(function(sprite) {
+    sprite.setAttributes({centerY:center[1] + offsetY - thickness / 2});
+  });
+}, updateAnimation:function(animation) {
+  this.getChart();
+  this.forEachSprite(function(sprite) {
+    sprite.setAnimation(animation);
+  });
+}, updateRenderer:function(renderer) {
+  this.getChart();
+  var rendererData = this.getRendererData();
+  this.forEachSprite(function(sprite, itemIndex) {
+    sprite.setConfig({renderer:renderer, rendererData:rendererData, rendererIndex:itemIndex});
+  });
+}, getRendererData:function() {
+  return {store:this.getStore(), angleField:this.getXField(), radiusField:this.getYField(), series:this};
+}, getSprites:function(createMissing) {
+  var me = this, store = me.getStore(), sprites = me.sprites;
+  if (!store) {
+    return Ext.emptyArray;
+  }
+  if (sprites && !createMissing) {
+    return sprites;
+  }
+  var surface = me.getSurface(), records = store.getData().items, spritesPerSlice = me.spritesPerSlice, partCount = me.partNames.length, recordCount = records.length, sprite, i, j;
+  for (i = 0; i < recordCount; i++) {
+    if (!sprites[i * spritesPerSlice]) {
+      for (j = 0; j < partCount; j++) {
+        sprite = surface.add({type:'pie3dPart', part:me.partNames[j], series:me});
+        sprite.getAnimation().setDurationOn('baseRotation', 0);
+        sprites.push(sprite);
+      }
+    }
+  }
+  return sprites;
+}, betweenAngle:function(x, a, b) {
+  var pp = Math.PI * 2, offset = this.rotationOffset;
+  a += offset;
+  b += offset;
+  x -= a;
+  b -= a;
+  x %= pp;
+  b %= pp;
+  x += pp;
+  b += pp;
+  x %= pp;
+  b %= pp;
+  return x < b || b === 0;
+}, getItemForPoint:function(x, y) {
+  var me = this, sprites = me.getSprites(), result = null;
+  if (!sprites) {
+    return result;
+  }
+  var store = me.getStore(), records = store.getData().items, spritesPerSlice = me.spritesPerSlice, hidden = me.getHidden(), i, ln, sprite, topPartIndex;
+  for (i = 0, ln = records.length; i < ln; i++) {
+    if (hidden[i]) {
+      continue;
+    }
+    topPartIndex = i * spritesPerSlice;
+    sprite = sprites[topPartIndex];
+    if (sprite.hitTest([x, y])) {
+      result = {series:me, sprite:sprites.slice(topPartIndex, topPartIndex + spritesPerSlice), index:i, record:records[i], category:'sprites', field:me.getXField()};
+      break;
+    }
+  }
+  return result;
+}, provideLegendInfo:function(target) {
+  var me = this, store = me.getStore();
+  if (store) {
+    var items = store.getData().items, labelField = me.getLabel().getTemplate().getField(), field = me.getField(), hidden = me.getHidden(), i, style, color;
+    for (i = 0; i < items.length; i++) {
+      style = me.getStyleByIndex(i);
+      color = style.baseColor;
+      target.push({name:labelField ? String(items[i].get(labelField)) : field + ' ' + i, mark:color || 'black', disabled:hidden[i], series:me.getId(), index:i});
+    }
+  }
+}}, function() {
+  var proto = this.prototype, definition = Ext.chart.series.sprite.Pie3DPart.def.getInitialConfig().processors.part;
+  proto.partNames = definition.replace(/^enums\(|\)/g, '').split(',');
+  proto.spritesPerSlice = proto.partNames.length;
+});
+Ext.define('Ext.chart.series.sprite.Polar', {extend:Ext.chart.series.sprite.Series, inheritableStatics:{def:{processors:{centerX:'number', centerY:'number', startAngle:'number', endAngle:'number', startRho:'number', endRho:'number', baseRotation:'number'}, defaults:{centerX:0, centerY:0, startAngle:0, endAngle:Math.PI, startRho:0, endRho:150, baseRotation:0}, triggers:{centerX:'bbox', centerY:'bbox', startAngle:'bbox', endAngle:'bbox', startRho:'bbox', endRho:'bbox', baseRotation:'bbox'}}}, updatePlainBBox:function(plain) {
+  var attr = this.attr;
+  plain.x = attr.centerX - attr.endRho;
+  plain.y = attr.centerY + attr.endRho;
+  plain.width = attr.endRho * 2;
+  plain.height = attr.endRho * 2;
+}});
+Ext.define('Ext.chart.series.sprite.Radar', {alias:'sprite.radar', extend:Ext.chart.series.sprite.Polar, getDataPointXY:function(index) {
+  var me = this, attr = me.attr, centerX = attr.centerX, centerY = attr.centerY, matrix = attr.matrix, minX = attr.dataMinX, maxX = attr.dataMaxX, dataX = attr.dataX, dataY = attr.dataY, endRho = attr.endRho, startRho = attr.startRho, baseRotation = attr.baseRotation, x, y, r, th, ox, oy, maxY;
+  if (attr.rangeY) {
+    maxY = attr.rangeY[1];
+  } else {
+    maxY = attr.dataMaxY;
+  }
+  th = (dataX[index] - minX) / (maxX - minX + 1) * 2 * Math.PI + baseRotation;
+  r = dataY[index] / maxY * (endRho - startRho) + startRho;
+  ox = centerX + Math.cos(th) * r;
+  oy = centerY + Math.sin(th) * r;
+  x = matrix.x(ox, oy);
+  y = matrix.y(ox, oy);
+  return [x, y];
+}, render:function(surface, ctx) {
+  var me = this, attr = me.attr, dataX = attr.dataX, length = dataX.length, surfaceMatrix = me.surfaceMatrix, markerCfg = {}, i, x, y, xy;
+  ctx.beginPath();
+  for (i = 0; i < length; i++) {
+    xy = me.getDataPointXY(i);
+    x = xy[0];
+    y = xy[1];
+    if (i === 0) {
+      ctx.moveTo(x, y);
+    }
+    ctx.lineTo(x, y);
+    markerCfg.translationX = surfaceMatrix.x(x, y);
+    markerCfg.translationY = surfaceMatrix.y(x, y);
+    me.putMarker('markers', markerCfg, i, true);
+  }
+  ctx.closePath();
+  ctx.fillStroke(attr);
+}});
+Ext.define('Ext.chart.series.Radar', {extend:Ext.chart.series.Polar, type:'radar', seriesType:'radar', alias:'series.radar', themeColorCount:function() {
+  return 1;
+}, isStoreDependantColorCount:false, themeMarkerCount:function() {
+  return 1;
+}, updateAngularAxis:function(axis) {
+  axis.processData(this);
+}, updateRadialAxis:function(axis) {
+  axis.processData(this);
+}, coordinateX:function() {
+  return this.coordinate('X', 0, 2);
+}, coordinateY:function() {
+  return this.coordinate('Y', 1, 2);
+}, updateCenter:function(center) {
+  this.setStyle({translationX:center[0] + this.getOffsetX(), translationY:center[1] + this.getOffsetY()});
+  this.doUpdateStyles();
+}, updateRadius:function(radius) {
+  this.setStyle({endRho:radius});
+  this.doUpdateStyles();
+}, updateRotation:function(rotation) {
+  var me = this, chart = me.getChart(), axes = chart.getAxes(), i, ln, axis;
+  for (i = 0, ln = axes.length; i < ln; i++) {
+    axis = axes[i];
+    axis.setRotation(rotation);
+  }
+  me.setStyle({rotationRads:rotation});
+  me.doUpdateStyles();
+}, updateTotalAngle:function(totalAngle) {
+  this.processData();
+}, getItemForPoint:function(x, y) {
+  var me = this, sprite = me.sprites && me.sprites[0], attr = sprite.attr, dataX = attr.dataX, length = dataX.length, store = me.getStore(), marker = me.getMarker(), threshhold, item, xy, i, bbox, markers;
+  if (me.getHidden()) {
+    return null;
+  }
+  if (sprite && marker) {
+    markers = sprite.getMarker('markers');
+    for (i = 0; i < length; i++) {
+      bbox = markers.getBBoxFor(i);
+      threshhold = (bbox.width + bbox.height) * 0.25;
+      xy = sprite.getDataPointXY(i);
+      if (Math.abs(xy[0] - x) < threshhold && Math.abs(xy[1] - y) < threshhold) {
+        item = {series:me, sprite:sprite, index:i, category:'markers', record:store.getData().items[i], field:me.getYField()};
+        return item;
+      }
+    }
+  }
+  return me.callParent(arguments);
+}, getDefaultSpriteConfig:function() {
+  var config = this.callParent(), animation = {customDurations:{translationX:0, translationY:0, rotationRads:0, dataMinX:0, dataMaxX:0}};
+  if (config.animation) {
+    Ext.apply(config.animation, animation);
+  } else {
+    config.animation = animation;
+  }
+  return config;
+}, getSprites:function() {
+  var me = this, chart = me.getChart(), sprites = me.sprites;
+  if (!chart) {
+    return Ext.emptyArray;
+  }
+  if (!sprites.length) {
+    me.createSprite();
+  }
+  return sprites;
+}, provideLegendInfo:function(target) {
+  var me = this, style = me.getSubStyleWithTheme(), fill = style.fillStyle;
+  if (Ext.isArray(fill)) {
+    fill = fill[0];
+  }
+  target.push({name:me.getTitle() || me.getYField() || me.getId(), mark:(Ext.isObject(fill) ? fill.stops && fill.stops[0].color : fill) || style.strokeStyle || 'black', disabled:me.getHidden(), series:me.getId(), index:0});
+}});
+Ext.define('Ext.chart.series.sprite.Scatter', {alias:'sprite.scatterSeries', extend:Ext.chart.series.sprite.Cartesian, renderClipped:function(surface, ctx, dataClipRect, surfaceClipRect) {
+  if (this.cleanRedraw) {
+    return;
+  }
+  var me = this, attr = me.attr, dataX = attr.dataX, dataY = attr.dataY, labels = attr.labels, series = me.getSeries(), isDrawLabels = labels && me.getMarker('labels'), surfaceMatrix = me.surfaceMatrix, matrix = me.attr.matrix, xx = matrix.getXX(), yy = matrix.getYY(), dx = matrix.getDX(), dy = matrix.getDY(), markerCfg = {}, changes, params, xScalingDirection = surface.getInherited().rtl && !attr.flipXY ? -1 : 1, left, right, top, bottom, x, y, i;
+  if (attr.flipXY) {
+    left = surfaceClipRect[1] - xx * xScalingDirection;
+    right = surfaceClipRect[1] + surfaceClipRect[3] + xx * xScalingDirection;
+    top = surfaceClipRect[0] - yy;
+    bottom = surfaceClipRect[0] + surfaceClipRect[2] + yy;
+  } else {
+    left = surfaceClipRect[0] - xx * xScalingDirection;
+    right = surfaceClipRect[0] + surfaceClipRect[2] + xx * xScalingDirection;
+    top = surfaceClipRect[1] - yy;
+    bottom = surfaceClipRect[1] + surfaceClipRect[3] + yy;
+  }
+  for (i = 0; i < dataX.length; i++) {
+    x = dataX[i];
+    y = dataY[i];
+    x = x * xx + dx;
+    y = y * yy + dy;
+    if (left <= x && x <= right && top <= y && y <= bottom) {
+      if (attr.renderer) {
+        markerCfg = {type:'markers', translationX:surfaceMatrix.x(x, y), translationY:surfaceMatrix.y(x, y)};
+        params = [me, markerCfg, {store:me.getStore()}, i];
+        changes = Ext.callback(attr.renderer, null, params, 0, series);
+        markerCfg = Ext.apply(markerCfg, changes);
+      } else {
+        markerCfg.translationX = surfaceMatrix.x(x, y);
+        markerCfg.translationY = surfaceMatrix.y(x, y);
+      }
+      me.putMarker('markers', markerCfg, i, !attr.renderer);
+      if (isDrawLabels && labels[i]) {
+        me.drawLabel(labels[i], x, y, i, surfaceClipRect);
+      }
+    }
+  }
+}, drawLabel:function(text, dataX, dataY, labelId, rect) {
+  var me = this, attr = me.attr, label = me.getMarker('labels'), labelTpl = label.getTemplate(), labelCfg = me.labelCfg || (me.labelCfg = {}), surfaceMatrix = me.surfaceMatrix, labelX, labelY, labelOverflowPadding = attr.labelOverflowPadding, flipXY = attr.flipXY, halfHeight, labelBox, changes, params;
+  labelCfg.text = text;
+  labelBox = me.getMarkerBBox('labels', labelId, true);
+  if (!labelBox) {
+    me.putMarker('labels', labelCfg, labelId);
+    labelBox = me.getMarkerBBox('labels', labelId, true);
+  }
+  if (flipXY) {
+    labelCfg.rotationRads = Math.PI * 0.5;
+  } else {
+    labelCfg.rotationRads = 0;
+  }
+  halfHeight = labelBox.height / 2;
+  labelX = dataX;
+  switch(labelTpl.attr.display) {
+    case 'under':
+      labelY = dataY - halfHeight - labelOverflowPadding;
+      break;
+    case 'rotate':
+      labelX += labelOverflowPadding;
+      labelY = dataY - labelOverflowPadding;
+      labelCfg.rotationRads = -Math.PI / 4;
+      break;
+    default:
+      labelY = dataY + halfHeight + labelOverflowPadding;
+  }
+  labelCfg.x = surfaceMatrix.x(labelX, labelY);
+  labelCfg.y = surfaceMatrix.y(labelX, labelY);
+  if (labelTpl.attr.renderer) {
+    params = [text, label, labelCfg, {store:me.getStore()}, labelId];
+    changes = Ext.callback(labelTpl.attr.renderer, null, params, 0, me.getSeries());
+    if (typeof changes === 'string') {
+      labelCfg.text = changes;
+    } else {
+      Ext.apply(labelCfg, changes);
+    }
+  }
+  me.putMarker('labels', labelCfg, labelId);
+}});
+Ext.define('Ext.chart.series.Scatter', {extend:Ext.chart.series.Cartesian, alias:'series.scatter', type:'scatter', seriesType:'scatterSeries', config:{itemInstancing:null, marker:true}, themeMarkerCount:function() {
+  return 1;
+}, provideLegendInfo:function(target) {
+  var me = this, style = me.getMarkerStyleByIndex(0), fill = style.fillStyle;
+  target.push({name:me.getTitle() || me.getYField() || me.getId(), mark:(Ext.isObject(fill) ? fill.stops && fill.stops[0].color : fill) || style.strokeStyle || 'black', disabled:me.getHidden(), series:me.getId(), index:0});
+}});
+Ext.define('Ext.chart.theme.Blue', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.blue', 'chart.theme.Blue'], config:{baseColor:'#4d7fe6'}});
+Ext.define('Ext.chart.theme.BlueGradients', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.blue-gradients', 'chart.theme.Blue:gradients'], config:{baseColor:'#4d7fe6', gradients:{type:'linear', degrees:90}}});
+Ext.define('Ext.chart.theme.Category1', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.category1', 'chart.theme.Category1'], config:{colors:['#f0a50a', '#c20024', '#2044ba', '#810065', '#7eae29']}});
+Ext.define('Ext.chart.theme.Category1Gradients', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.category1-gradients', 'chart.theme.Category1:gradients'], config:{colors:['#f0a50a', '#c20024', '#2044ba', '#810065', '#7eae29'], gradients:{type:'linear', degrees:90}}});
+Ext.define('Ext.chart.theme.Category2', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.category2', 'chart.theme.Category2'], config:{colors:['#6d9824', '#87146e', '#2a9196', '#d39006', '#1e40ac']}});
+Ext.define('Ext.chart.theme.Category2Gradients', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.category2-gradients', 'chart.theme.Category2:gradients'], config:{colors:['#6d9824', '#87146e', '#2a9196', '#d39006', '#1e40ac'], gradients:{type:'linear', degrees:90}}});
+Ext.define('Ext.chart.theme.Category3', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.category3', 'chart.theme.Category3'], config:{colors:['#fbbc29', '#ce2e4e', '#7e0062', '#158b90', '#57880e']}});
+Ext.define('Ext.chart.theme.Category3Gradients', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.category3-gradients', 'chart.theme.Category3:gradients'], config:{colors:['#fbbc29', '#ce2e4e', '#7e0062', '#158b90', '#57880e'], gradients:{type:'linear', degrees:90}}});
+Ext.define('Ext.chart.theme.Category4', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.category4', 'chart.theme.Category4'], config:{colors:['#ef5773', '#fcbd2a', '#4f770d', '#1d3eaa', '#9b001f']}});
+Ext.define('Ext.chart.theme.Category4Gradients', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.category4-gradients', 'chart.theme.Category4:gradients'], config:{colors:['#ef5773', '#fcbd2a', '#4f770d', '#1d3eaa', '#9b001f'], gradients:{type:'linear', degrees:90}}});
+Ext.define('Ext.chart.theme.Category5', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.category5', 'chart.theme.Category5'], config:{colors:['#7eae29', '#fdbe2a', '#910019', '#27b4bc', '#d74dbc']}});
+Ext.define('Ext.chart.theme.Category5Gradients', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.category5-gradients', 'chart.theme.Category5:gradients'], config:{colors:['#7eae29', '#fdbe2a', '#910019', '#27b4bc', '#d74dbc'], gradients:{type:'linear', degrees:90}}});
+Ext.define('Ext.chart.theme.Category6', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.category6', 'chart.theme.Category6'], config:{colors:['#44dce1', '#0b2592', '#996e05', '#7fb325', '#b821a1']}});
+Ext.define('Ext.chart.theme.Category6Gradients', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.category6-gradients', 'chart.theme.Category6:gradients'], config:{colors:['#44dce1', '#0b2592', '#996e05', '#7fb325', '#b821a1'], gradients:{type:'linear', degrees:90}}});
+Ext.define('Ext.chart.theme.DefaultGradients', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.default-gradients', 'chart.theme.Base:gradients'], config:{gradients:{type:'linear', degrees:90}}});
+Ext.define('Ext.chart.theme.Green', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.green', 'chart.theme.Green'], config:{baseColor:'#b1da5a'}});
+Ext.define('Ext.chart.theme.GreenGradients', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.green-gradients', 'chart.theme.Green:gradients'], config:{baseColor:'#b1da5a', gradients:{type:'linear', degrees:90}}});
+Ext.define('Ext.chart.theme.Midnight', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.midnight', 'chart.theme.Midnight'], config:{colors:['#a837ff', '#4ac0f2', '#ff4d35', '#ff8809', '#61c102', '#ff37ea'], chart:{defaults:{captions:{title:{docked:'top', padding:5, style:{textAlign:'center', fontFamily:'default', fontWeight:'bold', fillStyle:'rgb(224, 224, 227)', fontSize:'default*1.6'}}, subtitle:{docked:'top', style:{textAlign:'center', fontFamily:'default', fontWeight:'normal', 
+fillStyle:'rgb(224, 224, 227)', fontSize:'default*1.3'}}, credits:{docked:'bottom', padding:5, style:{textAlign:'left', fontFamily:'default', fontWeight:'lighter', fillStyle:'rgb(224, 224, 227)', fontSize:'default'}}}, background:'rgb(52, 52, 53)'}}, axis:{defaults:{style:{strokeStyle:'rgb(224, 224, 227)'}, label:{fillStyle:'rgb(224, 224, 227)'}, title:{fillStyle:'rgb(224, 224, 227)'}, grid:{strokeStyle:'rgb(112, 112, 115)'}}}, series:{defaults:{label:{fillStyle:'rgb(224, 224, 227)'}}}, sprites:{text:{fillStyle:'rgb(224, 224, 227)'}}, 
+legend:{label:{fillStyle:'white'}, border:{lineWidth:2, fillStyle:'rgba(255, 255, 255, 0.3)', strokeStyle:'rgb(150, 150, 150)'}, background:'rgb(52, 52, 53)'}}});
+Ext.define('Ext.chart.theme.Muted', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.muted', 'chart.theme.Muted'], config:{colors:['#8ca640', '#974144', '#4091ba', '#8e658e', '#3b8d8b', '#b86465', '#d2af69', '#6e8852', '#3dcc7e', '#a6bed1', '#cbaa4b', '#998baa']}});
+Ext.define('Ext.chart.theme.Purple', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.purple', 'chart.theme.Purple'], config:{baseColor:'#da5abd'}});
+Ext.define('Ext.chart.theme.PurpleGradients', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.purple-gradients', 'chart.theme.Purple:gradients'], config:{baseColor:'#da5abd', gradients:{type:'linear', degrees:90}}});
+Ext.define('Ext.chart.theme.Red', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.red', 'chart.theme.Red'], config:{baseColor:'#e84b67'}});
+Ext.define('Ext.chart.theme.RedGradients', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.red-gradients', 'chart.theme.Red:gradients'], config:{baseColor:'#e84b67', gradients:{type:'linear', degrees:90}}});
+Ext.define('Ext.chart.theme.Sky', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.sky', 'chart.theme.Sky'], config:{baseColor:'#4ce0e7'}});
+Ext.define('Ext.chart.theme.SkyGradients', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.sky-gradients', 'chart.theme.Sky:gradients'], config:{baseColor:'#4ce0e7', gradients:{type:'linear', degrees:90}}});
+Ext.define('Ext.chart.theme.Yellow', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.yellow', 'chart.theme.Yellow'], config:{baseColor:'#fec935'}});
+Ext.define('Ext.chart.theme.YellowGradients', {extend:Ext.chart.theme.Base, singleton:true, alias:['chart.theme.yellow-gradients', 'chart.theme.Yellow:gradients'], config:{baseColor:'#fec935', gradients:{type:'linear', degrees:90}}});
+Ext.define('Ext.chart.interactions.ItemInfo', {extend:Ext.chart.interactions.Abstract, type:'iteminfo', alias:'interaction.iteminfo', config:{extjsGestures:{'start':{event:'click', handler:'onInfoGesture'}, 'move':{event:'mousemove', handler:'onInfoGesture'}, 'end':{event:'mouseleave', handler:'onInfoGesture'}}}, item:null, onInfoGesture:function(e, element) {
+  var me = this, item = me.getItemForEvent(e), tooltip = item && item.series.tooltip;
+  if (tooltip) {
+    tooltip.onMouseMove.call(tooltip, e);
+  }
+  if (item !== me.item) {
+    if (item) {
+      item.series.showTip(item);
+    } else {
+      me.item.series.hideTip(me.item);
+    }
+    me.item = item;
+  }
+  return false;
+}});
 Ext.define(null, {override:'Ext.ux.gauge.needle.Abstract', compatibility:Ext.isIE10p, setTransform:function(centerX, centerY, rotation) {
   var needleGroup = this.getNeedleGroup();
   this.callParent([centerX, centerY, rotation]);
@@ -99546,20 +104521,23 @@ Ext.define('Admin.model.dashboard.repo.RepoModel', {extend:Admin.model.Base, fie
 proxy:{type:'rest', url:'/repo'}});
 Ext.define('Admin.model.dashboard.supplier.SupplierModel', {extend:Admin.model.Base, fields:[{type:'int', name:'id'}, {type:'string', name:'supplierName'}, {type:'string', name:'supplierPeople'}, {type:'string', name:'supplierPhone'}, {type:'string', name:'bankAccount'}, {type:'string', name:'bankName'}, {type:'string', name:'remark'}, {type:'string', name:'address'}, {type:'string', name:'status'}], proxy:{type:'rest', url:'/supplier'}});
 Ext.define('Admin.model.product.ProductModel', {extend:Admin.model.Base, fields:[{type:'int', name:'id'}, {type:'string', name:'productName'}, {type:'string', name:'productNum'}, {type:'string', name:'productImg'}, {type:'float', name:'productPrice'}, {type:'string', name:'status'}, {type:'string', name:'getBrandName'}, {type:'date', name:'createTime', dateFormat:'Y-m-d H:i:s'}, {type:'date', name:'updateTime', dateFormat:'Y-m-d H:i:s'}], proxy:{type:'rest', url:'/product'}});
-Ext.define('Admin.model.stockDetail.StockDetailModel', {extend:Admin.model.Base, fields:[{type:'int', name:'id'}, {type:'string', name:'stockName'}, {type:'string', name:'stockNum'}, {type:'string', name:'stockImg'}, {type:'float', name:'stockPrice'}, {type:'string', name:'status'}, {type:'string', name:'getBrandName'}, {type:'date', name:'createTime', dateFormat:'Y-m-d H:i:s'}, {type:'date', name:'updateTime', dateFormat:'Y-m-d H:i:s'}], proxy:{type:'rest', url:'/stock'}});
+Ext.define('Admin.model.stockDetail.StockDetailModel', {extend:Admin.model.Base, fields:[{type:'int', name:'id'}, {type:'string', name:'repoId', mapping:'repo.id'}, {type:'string', name:'repoName', mapping:'repo.repoName'}, {type:'string', name:'stockImg'}, {type:'float', name:'stockPrice'}, {type:'string', name:'status'}, {type:'string', name:'getBrandName'}, {type:'date', name:'createTime', dateFormat:'Y-m-d H:i:s'}, {type:'date', name:'updateTime', dateFormat:'Y-m-d H:i:s'}], proxy:{type:'rest', 
+url:'/stockDetail/getPurchase'}});
 Ext.define('Admin.model.stock.StockModel', {extend:Admin.model.Base, fields:[{type:'int', name:'id'}, {type:'string', name:'stockName'}, {type:'string', name:'stockNum'}, {type:'string', name:'stockImg'}, {type:'float', name:'stockPrice'}, {type:'string', name:'status'}, {type:'string', name:'getBrandName'}, {type:'date', name:'createTime', dateFormat:'Y-m-d H:i:s'}, {type:'date', name:'updateTime', dateFormat:'Y-m-d H:i:s'}], proxy:{type:'rest', url:'/stock'}});
+Ext.define('Admin.model.tran.TranModel', {extend:Ext.data.Model, fields:[{type:'int', name:'id'}, {type:'string', name:'repoFromName', mapping:'repoFrom.repoName'}, {type:'string', name:'repoToName', mapping:'repoTo.repoName'}, {type:'int', name:'moveNum'}, {type:'date', name:'moveDate'}]});
 Ext.define('Admin.store.NavigationTree', {extend:Ext.data.TreeStore, storeId:'NavigationTree', fields:[{name:'text'}], root:{expanded:true, children:[{text:'超市管理', iconCls:'x-fa fa-shopping-bag', expanded:false, selectable:false, children:[{text:'门店/仓库管理', iconCls:'x-fa fa-link', viewType:'repo', leaf:true}, {text:'商品管理', iconCls:'x-fa fa-link', viewType:'productPanel', leaf:true}, {text:'品牌管理', iconCls:'x-fa fa-link', viewType:'brandPanel', leaf:true}, {text:'供货商管理', iconCls:'x-fa fa-link', viewType:'supplier', 
 leaf:true}]}, {text:'进货管理', iconCls:'x-fa fa-truck', expanded:false, selectable:false, children:[{text:'新增进货单', iconCls:'x-fa fa-link', viewType:'order', leaf:true}, {text:'进货单管理', iconCls:'x-fa fa-link', leaf:true}]}, {text:'销售管理', iconCls:'x-fa fa-shopping-cart', expanded:false, selectable:false, children:[{text:'销售开单', iconCls:'x-fa fa-link', viewType:'order', leaf:true}, {text:'销售历史管理', iconCls:'x-fa fa-link', viewType:'order', leaf:true}]}, {text:'库存管理', iconCls:'x-fa fa-home', expanded:false, 
-selectable:false, children:[{text:'查看库存状况', iconCls:'x-fa fa-link', leaf:true}, {text:'库存流水', iconCls:'x-fa fa-link', leaf:true}, {text:'库存调拨', iconCls:'x-fa fa-link', leaf:true}]}, {text:'财务管理', iconCls:'x-fa fa-cny', expanded:false, selectable:false, children:[{text:'查看报表', iconCls:'x-fa fa-link', leaf:true}, {text:'财务记账', iconCls:'x-fa fa-link', leaf:true}, {text:'利润统计', iconCls:'x-fa fa-link', leaf:true}]}, {text:'权限管理', iconCls:'x-fa fa-users', expanded:false, selectable:false, children:[{text:'人员管理', 
-iconCls:'x-fa fa-link', leaf:true}]}]}});
+selectable:false, children:[{text:'查看库存状况', iconCls:'x-fa fa-link', viewType:'stockPiePanel', leaf:true}, {text:'库存调拨', iconCls:'x-fa fa-link', viewType:'stockDetailPanel', leaf:true}, {text:'仓库初始化', iconCls:'x-fa fa-link', viewType:'stockPanel', leaf:true}, {text:'库存流水', iconCls:'x-fa fa-link', viewType:'tranPanel', leaf:true}]}, {text:'财务管理', iconCls:'x-fa fa-cny', expanded:false, selectable:false, children:[{text:'查看报表', iconCls:'x-fa fa-link', leaf:true}, {text:'财务记账', iconCls:'x-fa fa-link', 
+leaf:true}, {text:'利润统计', iconCls:'x-fa fa-link', leaf:true}]}, {text:'权限管理', iconCls:'x-fa fa-users', expanded:false, selectable:false, children:[{text:'人员管理', iconCls:'x-fa fa-link', leaf:true}]}]}});
 Ext.define('Admin.store.brand.BrandStroe', {extend:Ext.data.Store, storeId:'brandStroe', alias:'store.brandStroe', model:'Admin.model.brand.BrandModel', proxy:{type:'rest', url:'/brand', reader:{type:'json', rootProperty:'content', totalProperty:'totalElements'}, writer:{type:'json'}, simpleSortMode:true}, autoLoad:true, autoSync:true, remoteSort:true, pageSize:10, sorters:{direction:'ASC', property:'id'}, listeners:{}});
 Ext.define('Admin.store.dashboard.repo.RepoGridStore', {extend:Ext.data.Store, storeId:'repoGridStore', alias:'store.repoGridStore', model:'Admin.model.dashboard.repo.RepoModel', proxy:{type:'rest', url:'/repo', reader:{type:'json', rootProperty:'content', totalProperty:'totalElements'}, writer:{type:'json'}, simpleSortMode:true}, autoLoad:true, autoSync:true, remoteSort:true, pageSize:16, sorters:{direction:'DESC', property:'id'}});
 Ext.define('Admin.store.dashboard.supplier.SupplierGridStore', {extend:Ext.data.Store, storeId:'supplierGridStore', alias:'store.supplierGridStore', model:'Admin.model.dashboard.supplier.SupplierModel', proxy:{type:'rest', url:'/supplier', reader:{type:'json', rootProperty:'content', totalProperty:'totalElements'}, writer:{type:'json'}, simpleSortMode:true}, autoLoad:true, autoSync:true, remoteSort:true, pageSize:16, sorters:{direction:'DESC', property:'id'}});
 Ext.define('Admin.store.order.OrderGridStroe', {extend:Ext.data.Store, alias:'store.orderGridStroe', fields:[{type:'int', name:'identifier'}, {type:'string', name:'fullname'}, {type:'string', name:'email'}, {name:'subscription'}, {type:'date', name:'joinDate'}, {type:'boolean', name:'isActive'}, {name:'profile_pic'}], data:{'lists':[{'identifier':1, 'fullname':'Archie Young', 'profile_pic':'1.png', 'email':'dwatkins@mydeo.name', 'subscription':'minima', 'joinDate':'10/16/2012', 'isActive':false}, 
 {'identifier':2, 'fullname':'May Williams', 'profile_pic':'2.png', 'email':'jreid@babbleblab.com', 'subscription':'ab', 'joinDate':'6/13/2004', 'isActive':true}]}, proxy:{type:'memory', reader:{type:'json', rootProperty:'lists'}}, autoLoad:'true', sorters:{direction:'ASC', property:'fullname'}});
-Ext.define('Admin.store.product.ProductStroe', {extend:Ext.data.Store, storeId:'productStroe', alias:'store.productStroe', model:'Admin.model.product.ProductModel', proxy:{type:'rest', url:'/product', reader:{type:'json', rootProperty:'content', totalProperty:'totalElements'}, writer:{type:'json'}, simpleSortMode:true}, autoLoad:true, autoSync:true, remoteSort:true, pageSize:10, sorters:{direction:'ASC', property:'id'}, listeners:{}});
-Ext.define('Admin.store.stockDetail.StockDetailStroe', {extend:Ext.data.Store, storeId:'sockDetailStroe', alias:'store.stockDetailStroe', model:'Admin.model.stockDetail.StockDetailModel', proxy:{type:'rest', url:'/stock', reader:{type:'json', rootProperty:'content', totalProperty:'totalElements'}, writer:{type:'json'}, simpleSortMode:true}, autoLoad:true, autoSync:true, remoteSort:true, pageSize:10, sorters:{direction:'ASC', property:'id'}, listeners:{}});
-Ext.define('Admin.store.stock.StockStroe', {extend:Ext.data.Store, storeId:'stockStroe', alias:'store.stockStroe', model:'Admin.model.stock.StockModel', proxy:{type:'rest', url:'/stock', reader:{type:'json', rootProperty:'content', totalProperty:'totalElements'}, writer:{type:'json'}, simpleSortMode:true}, autoLoad:true, autoSync:true, remoteSort:true, pageSize:10, sorters:{direction:'ASC', property:'id'}, listeners:{}});
+Ext.define('Admin.store.product.ProductStore', {extend:Ext.data.Store, storeId:'productStore', alias:'store.productStore', model:'Admin.model.product.ProductModel', proxy:{type:'rest', url:'/product', reader:{type:'json', rootProperty:'content', totalProperty:'totalElements'}, writer:{type:'json'}, simpleSortMode:true}, autoLoad:true, autoSync:true, remoteSort:true, pageSize:10, sorters:{direction:'ASC', property:'id'}, listeners:{}});
+Ext.define('Admin.store.stockDetail.StockDetailStore', {extend:Ext.data.Store, storeId:'stockDetailStore', alias:'store.stockDetailStore', model:'Admin.model.stockDetail.StockDetailModel', proxy:{type:'rest', url:'/stockDetail/getPurchase', reader:{type:'json', rootProperty:'content', totalProperty:'totalElements'}, writer:{type:'json'}, simpleSortMode:true}, autoLoad:true, autoSync:true, remoteSort:true, pageSize:10, sorters:{direction:'ASC', property:'id'}, listeners:{}});
+Ext.define('Admin.store.stock.StockStroe', {extend:Ext.data.Store, storeId:'stockStroe', alias:'store.stockStroe', model:'Admin.model.stock.StockModel', proxy:{type:'rest', url:'/repo/getUninit', reader:{type:'json', rootProperty:'content', totalProperty:'totalElements'}, writer:{type:'json'}, simpleSortMode:true}, autoLoad:true, autoSync:true, remoteSort:true, pageSize:10, sorters:{direction:'ASC', property:'id'}, listeners:{}});
+Ext.define('Admin.store.tran.TranStore', {extend:Ext.data.Store, storeId:'tranStore', alias:'store.tranStore', model:'Admin.model.tran.TranModel', proxy:{type:'rest', url:'/tran', reader:{type:'json', rootProperty:'content', totalProperty:'totalElements'}, writer:{type:'json'}, simpleSortMode:true}, autoLoad:true, autoSync:true, remoteSort:true, pageSize:10, sorters:{direction:'ASC', property:'id'}});
 Ext.define('Admin.view.dashboard.DashboardController', {extend:Ext.app.ViewController, alias:'controller.dashboard', onRefreshToggle:function(tool, e, owner) {
   var store, runner;
   if (tool.toggleValue) {
@@ -100356,41 +105334,45 @@ Ext.define('Admin.view.product.ProductViewController', {extend:Ext.app.ViewContr
 }, cancelLeaveProcess:function(grid, rowIndex, colIndex) {
   Ext.Msg.alert('Title', 'Cancel Leave Process');
 }});
-Ext.define('Admin.view.product.ProductViewModel', {extend:Ext.app.ViewModel, alias:'viewmodel.productViewModel', stores:{productLists:{type:'productStroe'}}});
-Ext.define('Admin.view.stockDetail.StockDetailAddWindow', {extend:Ext.window.Window, alias:'widget.stockDetailAddWindow', height:350, minHeight:350, minWidth:300, width:500, scrollable:true, title:'仓库完善', closable:true, constrain:true, defaultFocus:'textfield', modal:true, layout:'fit', items:[{xtype:'form', layout:'form', padding:'10px', ariaLabel:'Enter your name', items:[{xtype:'textfield', fieldLabel:'id', name:'id', hidden:true, readOnly:true}, {xtype:'datefield', fieldLabel:'创建时间', format:'Y-m-d H:i:s', 
-name:'createTime', editable:false, value:new Date, readOnly:true}, {xtype:'datefield', fieldLabel:'最后更新时间', format:'Y-m-d H:i:s', name:'updateTime', editable:false, value:new Date, readOnly:true, hidden:true}, {xtype:'textfield', name:'stockDetailName', fieldLabel:'商品名称', allowBlank:false}, {xtype:'textfield', name:'stockDetailPrice', fieldLabel:'商品单价', allowBlank:false}, {xtype:'radiogroup', fieldLabel:'商品状态', items:[{name:'status', boxLabel:'在售', inputValue:'1', checked:true}, {name:'status', boxLabel:'下架', 
-inputValue:'0'}]}, {xtype:'combobox', name:'getBrandName', fieldLabel:'商品品牌', store:new Ext.data.Store({proxy:new Ext.data.HttpProxy({url:'brand/getBrand'}), reader:new Ext.data.JsonReader({rootProperty:''}, []), autoLoad:true}), displayField:'name', hiddenName:'getBrandName', valueField:'value', triggerAction:'all', editable:false, allowBlank:false}]}], buttons:['-\x3e', {xtype:'button', text:'提交', handler:'submitAddForm'}, {xtype:'button', text:'关闭', handler:function(btn) {
-  btn.up('window').close();
-}}, '-\x3e']});
-Ext.define('Admin.view.stockDetail.StockDetailEditWindow', {extend:Ext.window.Window, alias:'widget.stockDetailEditWindow', height:480, minHeight:480, minWidth:500, width:500, scrollable:false, title:'Edit stockDetail Window', closable:true, constrain:true, defaultFocus:'textfield', modal:true, items:[{layout:'absolute', x:150, items:[{xtype:'image', id:'imageId', width:143, height:162}]}, {xtype:'form', layout:'form', ariaLabel:'Enter your name', items:[{xtype:'textfield', fieldLabel:'id', name:'id', 
-hidden:true, readOnly:true}, {xtype:'filefield', id:'upload', fieldLabel:'品牌商标', name:'stockDetailImg', allowBlank:false, listeners:{'render':function() {
-  Ext.getCmp('upload').on('change', function(field, newValue, oldValue) {
-    var file = field.fileInputEl.dom.files.item(0);
-    var fileReader = new FileReader('file://' + newValue);
-    fileReader.readAsDataURL(file);
-    fileReader.onload = function(e) {
-      var a = Ext.getCmp('imageId').setSrc(e.target.result);
-    };
-  });
-}}}, {xtype:'textfield', fieldLabel:'id', name:'id', hidden:true, readOnly:true}, {xtype:'textfield', fieldLabel:'品牌名', name:'stockDetailName', allowBlank:false}, {xtype:'textfield', name:'stockDetailPrice', fieldLabel:'商品单价', allowBlank:false}, {xtype:'radiogroup', fieldLabel:'商品状态', items:[{name:'status', boxLabel:'在售', inputValue:'1', checked:true}, {name:'status', boxLabel:'下架', inputValue:'0'}]}, {xtype:'combobox', name:'getBrandName', id:'getBrandName', fieldLabel:'商品品牌', store:new Ext.data.Store({proxy:new Ext.data.HttpProxy({url:'brand/getBrand'}), 
-reader:new Ext.data.JsonReader({rootProperty:''}, []), autoLoad:true}), displayField:'name', hiddenName:'getBrandName', valueField:'value', triggerAction:'all', editable:false, allowBlank:false}]}], buttons:['-\x3e', {xtype:'button', text:'提交', handler:'submitEditForm'}, {xtype:'button', text:'Close', handler:function(btn) {
-  btn.up('window').close();
-}}, '-\x3e']});
-Ext.define('Admin.view.stockDetail.StockDetailGridPanel', {extend:Ext.panel.Panel, xtype:'stockDetailGridPanel', layout:'fit', items:[{xtype:'gridpanel', title:'商品列表', bind:'{stockDetailLists}', scrollable:false, selModel:{type:'checkboxmodel'}, columns:[{header:'序号', dataIndex:'id', flex:0.5, sortable:true, align:'center'}, {header:'创建时间', dataIndex:'createTime', flex:1.3, sortable:true, align:'center', renderer:Ext.util.Format.dateRenderer('Y-m-d H:i:s')}, {header:'最后修改时间', dataIndex:'updateTime', 
-flex:1.3, sortable:true, align:'center', renderer:Ext.util.Format.dateRenderer('Y-m-d H:i:s')}, {header:'商品图片', dataIndex:'productImg', flex:1.2, sortable:true, renderer:function(value) {
-  return "\x3cimg src\x3d'resources/images/" + value + "' alt\x3d'' height\x3d'40px' width\x3d'40px'\x3e";
-}, align:'center'}, {header:'商品名称', dataIndex:'productName', flex:1.2, sortable:true, align:'center'}, {header:'商品编号', dataIndex:'productNum', flex:1, sortable:true, align:'center'}, {header:'商品价格', dataIndex:'productPrice', flex:1, sortable:true, align:'center'}, {header:'状态', dataIndex:'status', flex:0.6, sortable:true, align:'center', renderer:function(value) {
-  if (value == '0') {
-    return '下架';
-  } else {
-    return '在售';
+Ext.define('Admin.view.product.ProductViewModel', {extend:Ext.app.ViewModel, alias:'viewmodel.productViewModel', stores:{productLists:{type:'productStore'}}});
+Ext.define('Admin.view.stockDetail.StockDetailAddWindow', {extend:Ext.window.Window, alias:'widget.stockDetailAddWindow', height:600, minHeight:350, minWidth:300, width:500, title:'库存调拨', closable:true, constrain:true, defaultFocus:'textfield', modal:true, layout:'fit', items:[{scrollable:true, id:'form', xtype:'form', layout:'form', padding:'10px', ariaLabel:'Enter your name', items:[{xtype:'textfield', fieldLabel:'id', name:'id', hidden:true, readOnly:true}, {id:'getRepo', xtype:'combobox', name:'getRepo', 
+fieldLabel:'调出仓库', store:new Ext.data.Store({proxy:new Ext.data.HttpProxy({url:'repo/setRepo'}), reader:new Ext.data.JsonReader({rootProperty:''}, []), autoLoad:true}), displayField:'name', hiddenName:'getRepo', valueField:'value', triggerAction:'all', editable:false, allowBlank:false, listeners:{select:function(combo) {
+  var count = 0;
+  var form = Ext.getCmp('form');
+  while (true) {
+    if (Ext.getCmp('com' + count) != null) {
+      form.remove(Ext.getCmp('com' + count));
+      form.remove(Ext.getCmp('text' + count));
+      count++;
+    } else {
+      if (Ext.getCmp('com' + count) == null) {
+        break;
+      }
+    }
   }
-}}, {header:'商品品牌', dataIndex:'brand', flex:1, align:'center', renderer:function(value) {
-  return value.brandName;
-}}, {header:'商品品牌值', dataIndex:'brandName1', align:'center', hidden:true}, {xtype:'actioncolumn', cls:'content-column', flex:0.8, text:'Actions', align:'center', tooltip:'tool ', items:[{xtype:'button', iconCls:'x-fa fa-pencil', handler:'openEditWindow'}, {xtype:'button', iconCls:'x-fa fa-close', handler:'deleteOneRow'}]}], forceFit:true, tbar:[{xtype:'combobox', reference:'searchFieldName', hideLabel:true, store:Ext.create('Ext.data.Store', {fields:['name', 'value'], data:[{name:'按创建时间', value:'createTime'}, 
-{name:'按最后修改时间', value:'updateTime'}, {name:'按价格区间', value:'productPrice'}]}), displayField:'name', valueField:'value', value:'createTime', editable:false, queryMode:'local', triggerAction:'all', emptyText:'Select a state...', width:150, listeners:{select:'searchComboboxSelectChuang'}}, '-', {xtype:'datefield', hideLabel:true, editable:false, format:'Y-m-d', reference:'searchDataFieldValue1'}, {xtype:'datefield', editable:false, hideLabel:true, format:'Y-m-d', reference:'searchDataFieldValue2'}, 
-{xtype:'textfield', hideLabel:true, reference:'searchTextFieldValue1', hidden:true}, {xtype:'textfield', hideLabel:true, reference:'searchTextFieldValue2', hidden:true}, '-', {text:'Search', iconCls:'fa fa-search', handler:'quickSearch', itemId:'searchButton'}, '-', {text:'Search More', iconCls:'fa fa-search-plus', handler:'openSearchWindow'}, '-\x3e', {text:'Add', tooltip:'Add a new row', iconCls:'fa fa-plus', handler:'openAddWindow'}, '-', {text:'Removes', tooltip:'Remove the selected item', iconCls:'fa fa-trash', 
-itemId:'brandGridPanelRemove', disabled:true, handler:'deleteMoreRows'}], dockedItems:[{xtype:'pagingtoolbar', dock:'bottom', displayInfo:true, bind:'{productLists}'}], listeners:{selectionchange:function(selModel, selections) {
+}}}, {id:'setRepo', xtype:'combobox', name:'setRepo', fieldLabel:'调入仓库/门店', store:new Ext.data.Store({proxy:new Ext.data.HttpProxy({url:'repo/getRepo'}), reader:new Ext.data.JsonReader({rootProperty:''}, []), autoLoad:true}), displayField:'name', hiddenName:'setRepo', valueField:'value', triggerAction:'all', editable:false, allowBlank:false}]}], buttons:['-\x3e', {xtype:'button', text:'提交', handler:'submitAddForm'}, '-\x3e', {xtype:'button', text:'添加商品栏', handler:function(btn) {
+  var url = Ext.getCmp('getRepo').getValue();
+  var count = 0;
+  while (true) {
+    if (Ext.getCmp('com' + count) != null) {
+      count++;
+    } else {
+      if (Ext.getCmp('com' + count) == null) {
+        break;
+      }
+    }
+  }
+  var com = new Ext.form.ComboBox({id:'com' + count, name:'getProductName', fieldLabel:'商品名', store:new Ext.data.Store({proxy:new Ext.data.HttpProxy({url:'stockDetail/getProduct?repoid\x3d' + url}), reader:new Ext.data.JsonReader({rootProperty:''}, []), autoLoad:true}), displayField:'name', hiddenName:'getBrandName', valueField:'value', triggerAction:'all', editable:false, allowBlank:false});
+  var textfield = new Ext.form.TextField({id:'text' + count, fieldLabel:'数量'});
+  var win = btn.up('window');
+  var form = win.down('form');
+  form.add(com);
+  form.add(textfield);
+}}]});
+Ext.define('Admin.view.stockDetail.StockDetailEditWindow', {extend:Ext.window.Window, alias:'widget.stockDetailEditWindow', title:'进货详单', frame:true, width:650, height:430, bodyPadding:10, scrollable:true, items:[{scrollable:true, xtype:'checkboxgroup', fieldLabel:'商品集合', id:'productlist', cls:'x-check-group-alt', columns:3, items:[]}, {id:'parm', xtype:'textfield', fieldLabel:'id', name:'repoId', hidden:true, readOnly:true}], buttons:[{text:'提交', handler:'submitEditForm'}, {text:'重置', handler:'onResetFormClick'}, 
+{text:'全选', handler:'onAllFormClick'}]});
+Ext.define('Admin.view.stockDetail.StockDetailGridPanel', {extend:Ext.panel.Panel, xtype:'stockDetailGridPanel', layout:'fit', items:[{xtype:'gridpanel', title:'库存列表', bind:'{stockDetailLists}', scrollable:false, columns:[{header:'序号', dataIndex:'id', flex:0.5, sortable:true, align:'center'}, {header:'创建时间', dataIndex:'purchaseTime', flex:1.3, sortable:true, align:'center', renderer:Ext.util.Format.dateRenderer('Y-m-d H:i:s')}, {header:'存入仓库', dataIndex:'repoName', flex:1, sortable:true, align:'center'}, 
+{xtype:'actioncolumn', cls:'content-column', flex:1.5, text:'Actions', align:'center', tooltip:'tool ', items:[{xtype:'button', iconCls:'x-fa fa-pencil', handler:'openEditWindow'}]}], forceFit:true, tbar:['-\x3e', {text:'库存调拨', tooltip:'库存调拨', iconCls:'fa fa-plus', handler:'openAddWindow'}], dockedItems:[{xtype:'pagingtoolbar', dock:'bottom', displayInfo:true, bind:'{productLists}'}], listeners:{selectionchange:function(selModel, selections) {
   this.down('#brandGridPanelRemove').setDisabled(selections.length === 0);
 }}}]});
 Ext.define('Admin.view.stockDetail.StockDetailPanel', {extend:Ext.container.Container, xtype:'stockDetailPanel', controller:'stockDetailViewController', viewModel:{type:'stockDetailViewModel'}, layout:'fit', items:[{xtype:'stockDetailGridPanel'}]});
@@ -100405,13 +105387,240 @@ Ext.define('Admin.view.stockDetail.StockDetailViewController', {extend:Ext.app.V
 }, openEditWindow:function(grid, rowIndex, colIndex) {
   var record = grid.getStore().getAt(rowIndex);
   var win = grid.up('container').add(Ext.widget('stockDetailEditWindow'));
+  Ext.Ajax.request({url:'/stockDetail/purchasepro', method:'post', params:{purid:record.id}, success:function(response) {
+    var result = Ext.decode(response.responseText);
+    for (var i = 0; i < result.length; i++) {
+      var checkboxObj = {boxLabel:result[i].name, checked:false, inputValue:result[i].value};
+      var checkbox = new Ext.form.Checkbox(checkboxObj);
+      Ext.getCmp('productlist').items.add(checkbox);
+    }
+    Ext.getCmp('parm').setValue(record.id);
+    win.show();
+  }});
+}, submitAddForm:function(btn) {
+  var count = 0;
+  var bothFlag = 0;
+  var nullFlag = 0;
+  var Flagplus = 0;
+  var stockflag = 0;
+  var textItem = new Array;
+  var comItem = new Array;
+  var repoid1 = Ext.getCmp('getRepo').getValue();
+  var repoid2 = Ext.getCmp('setRepo').getValue();
+  if ((repoid1 && repoid2) == null) {
+    Ext.Msg.alert('Error', '必须选择仓库');
+  } else {
+    if (repoid1 == repoid2) {
+      Ext.Msg.alert('Error', '调出仓库和调入仓库不能是同一个');
+    } else {
+      while (true) {
+        if (Ext.getCmp('com' + count) != null) {
+          if (Ext.getCmp('com' + count).getValue() != null && Ext.getCmp('text' + count).getValue() != '') {
+            comItem[count] = Ext.getCmp('com' + count).getValue();
+            if (/(^[1-9]\d*$)/.test(Ext.getCmp('text' + count).getValue())) {
+              var string = Ext.getCmp('com' + count).getRawValue();
+              var patt = new RegExp(/.*\([^\)\(\d]*(\d+)[^\)\(\d]*\).*/, 'g');
+              var num = patt.exec(string);
+              if (num[1] >= parseInt(Ext.getCmp('text' + count).getValue())) {
+                textItem[count] = Ext.getCmp('text' + count).getValue();
+              } else {
+                stockflag = 1;
+              }
+            } else {
+              Flagplus = 1;
+            }
+          } else {
+            if (Ext.getCmp('com' + count).getValue() == null && Ext.getCmp('text' + count).getValue() == '') {
+            } else {
+              nullFlag = 1;
+              break;
+            }
+          }
+          count++;
+        } else {
+          if (Ext.getCmp('com' + count) == null) {
+            break;
+          }
+        }
+      }
+      for (var i = 0; i < comItem.length - 1; i++) {
+        for (var j = i + 1; j < comItem.length; j++) {
+          if (comItem[i] == comItem[j]) {
+            bothFlag = 1;
+            break;
+          }
+        }
+      }
+      if (nullFlag == 1) {
+        Ext.Msg.alert('Error', '商品与数量必须同时填写');
+      } else {
+        if (Flagplus == 1) {
+          Ext.Msg.alert('Error', '商品数量必须是正整数');
+        } else {
+          if (stockflag == 1) {
+            Ext.Msg.alert('Error', '调拨商品数量过多，库存不足');
+          } else {
+            if (bothFlag == 0) {
+              if ((Ext.getCmp('com0') && Ext.getCmp('text0')) == null) {
+                Ext.Msg.alert('Error', '至少要提交一个商品');
+              } else {
+                var win = btn.up('window');
+                var store = Ext.data.StoreManager.lookup('stockDetailStore');
+                store.proxy.url = '/stockDetail/save';
+                Ext.apply(store.proxy.extraParams, {toSubmit:{textItem:textItem, comItem:comItem, repoid1:repoid1, repoid2:repoid2}});
+                store.load({params:{start:0, limit:10, page:1}});
+                win.close();
+              }
+            } else {
+              if (bothFlag == 1) {
+                Ext.Msg.alert('Error', '不能有两个相同的商品选项');
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}, submitEditForm:function(btn) {
+  var array = Ext.getCmp('productlist').getChecked();
+  var subitem = new Array;
+  subitem[0] = Ext.getCmp('parm').getValue();
+  for (var i = 0; i < array.length; i++) {
+    subitem[i + 1] = array[i].inputValue;
+  }
+  Ext.Ajax.request({url:'/stockDetail/tran', method:'post', params:{subitem:subitem}, success:function(response) {
+    var json = Ext.util.JSON.decode(response.responseText);
+    if (json.success) {
+      Ext.Msg.alert('操作成功', json.msg);
+      btn.up('window').close();
+      Ext.data.StoreManager.lookup('stockDetailStore').load();
+    } else {
+      Ext.Msg.alert('操作失败', json.msg);
+    }
+    win.close();
+  }});
+}, onResetFormClick:function() {
+  var array = Ext.getCmp('productlist').getChecked();
+  for (var i = 0; i < array.length; i++) {
+    array[i].setValue(false);
+  }
+}, onAllFormClick:function() {
+  var array = Ext.getCmp('productlist').items;
+  array.each(function(item) {
+    item.setValue(true);
+  });
+}});
+Ext.define('Admin.view.stockDetail.StockDetailViewModel', {extend:Ext.app.ViewModel, alias:'viewmodel.stockDetailViewModel', stores:{stockDetailLists:{type:'stockDetailStore'}}});
+Ext.define('Admin.view.stock.StockCloumnStore', {extend:Ext.data.Store, alias:'store.two-year-sales', fields:['name', 'value1', 'value2'], proxy:{type:'rest', url:'/stock/getAllRepoCloumn', reader:{type:'json'}, writer:{type:'json'}}, autoLoad:true});
+Ext.define('Admin.view.stock.StockGridPanel', {extend:Ext.panel.Panel, xtype:'stockGridPanel', layout:'fit', items:[{xtype:'gridpanel', title:'商品列表', bind:'{stockLists}', scrollable:false, selModel:{type:'checkboxmodel'}, columns:[{header:'序号', dataIndex:'id', flex:0.5, sortable:true, align:'center'}, {header:'创建时间', dataIndex:'buildDate', flex:1.3, sortable:true, align:'center', renderer:Ext.util.Format.dateRenderer('Y-m-d H:i:s')}, {header:'名称', dataIndex:'repoName', flex:1.2, sortable:true, align:'center'}, 
+{header:'类型', dataIndex:'type', flex:1, sortable:true, align:'center'}], forceFit:true, tbar:['-\x3e', {text:'仓库初始化', tooltip:'init repository', iconCls:'fa fa-plus', handler:'openAddWindow'}], dockedItems:[{xtype:'pagingtoolbar', dock:'bottom', displayInfo:true, bind:'{stockLists}'}]}]});
+Ext.define('Admin.view.stock.StockPanel', {extend:Ext.container.Container, xtype:'stockPanel', controller:'stockViewController', viewModel:{type:'stockViewModel'}, layout:'fit', items:[{xtype:'stockGridPanel'}]});
+Ext.define('Admin.view.stock.StockPiePanel', {extend:Ext.panel.Panel, xtype:'stockPiePanel', controller:'pie-basic', items:[{tbar:[{xtype:'combobox', reference:'searchFieldName', hideLabel:true, store:Ext.create('Ext.data.Store', {fields:['name', 'value'], data:[{name:'选择仓库', value:'selectrepo'}]}), displayField:'name', valueField:'value', value:'select', editable:false, queryMode:'local', triggerAction:'all', emptyText:'Select a state...', width:150, listeners:{select:'searchComboboxSelectChuang'}}, 
+'-', {id:'searchCom', xtype:'combobox', name:'getRepo', store:new Ext.data.Store({proxy:new Ext.data.HttpProxy({url:'repo/getRepo'}), reader:new Ext.data.JsonReader({rootProperty:''}, []), autoLoad:true}), displayField:'name', hiddenName:'getRepo', valueField:'value', triggerAction:'all', editable:false, allowBlank:false, hidden:true, reference:'searchCom'}, '-', {text:'查找', iconCls:'fa fa-search', handler:'quickSearch', itemId:'searchButton'}, {text:'返回总览', iconCls:'fa fa-search', handler:'back'}]}, 
+{html:'\x3cp style\x3d"padding:50px;background-color: #D9EDF7;"\x3e\x3c/p\x3e', border:0}, {id:'repoCloumn', xtype:'cartesian', width:'100%', height:400, captions:{title:{text:'仓库总概况图', alignTo:'chart'}}, theme:'Muted', interactions:['itemhighlight'], animation:{duration:200}, store:{type:'two-year-sales'}, legend:{type:'dom', docked:'bottom'}, axes:[{type:'numeric3d', position:'left', fields:['value1', 'value2'], grid:true, title:'仓库容量', renderer:'onAxisLabelRender'}, {type:'category3d', position:'bottom', 
+fields:'name', title:{text:'仓库名', translationX:-30}, grid:true}], series:{type:'bar3d', stacked:false, title:['已用容量', '总容量'], xField:'name', yField:['value1', 'value2'], label:{field:['value1', 'value2'], display:'insideEnd', renderer:'onSeriesLabelRender'}, highlight:true, style:{inGroupGapWidth:-7}}}, {id:'myPie', xtype:'polar', reference:'chart', theme:'default-gradients', width:'100%', height:500, insetPadding:40, innerPadding:20, store:{}, hidden:true, legend:{docked:'bottom'}, interactions:['rotate'], 
+series:[{type:'pie', angleField:'value', label:{field:'name', calloutLine:{length:60, width:3}}, highlight:true, tooltip:{trackMouse:true, renderer:'onSeriesTooltipRender'}}]}]});
+Ext.define('Admin.view.stock.StockPieViewController', {extend:Ext.app.ViewController, alias:'controller.pie-basic', onAxisLabelRender:function(axis, label, layoutContext) {
+  var value = layoutContext.renderer(label);
+  return value;
+}, onSeriesLabelRender:function(value) {
+}, onGridColumnRender:function(v) {
+  return Ext.util.Format.number(v, '0,000');
+}, onPreview:function() {
+  if (Ext.isIE8) {
+    Ext.Msg.alert('Unsupported Operation', 'This operation requires a newer version of Internet Explorer.');
+    return;
+  }
+  var chart = this.lookup('chart');
+  chart.preview();
+}, onDataRender:function(v) {
+  return v + '%';
+}, onSeriesTooltipRender:function(tooltip, record, item) {
+  var total = 0;
+  Ext.getCmp('myPie').store.each(function(record) {
+    total += record.get('value');
+  });
+  thispercent = record.get('value') * 100 / total;
+  thispercent = thispercent.toFixed(2);
+  tooltip.setHtml(record.get('name') + ': ' + thispercent + '%');
+}, searchComboboxSelectChuang:function(combo, record, index) {
+  var searchField = this.lookupReference('searchFieldName').getValue();
+  if (searchField === 'selectrepo') {
+    this.lookupReference('searchCom').show();
+  }
+}, quickSearch:function(btn) {
+  var store = new Ext.data.Store({fields:['name', 'value'], proxy:new Ext.data.HttpProxy({type:'rest', url:'/stock/getRepoPie', reader:{type:'json'}, writer:{type:'json'}}), autoLoad:true});
+  var myPie = Ext.getCmp('myPie');
+  myPie.setStore(store);
+  var stor = myPie.getStore();
+  var searchField = this.lookupReference('searchFieldName').getValue();
+  var searchTextFieldValue = Ext.getCmp('searchCom').getValue();
+  if (searchField == 'selectrepo') {
+    if (searchTextFieldValue != null) {
+      var reoid = searchTextFieldValue;
+      Ext.apply(stor.proxy.extraParams, {reoid:reoid});
+      stor.load();
+      myPie.show();
+      Ext.getCmp('repoCloumn').hide();
+    } else {
+      Ext.Msg.alert('Error', '仓库不能为空');
+    }
+  } else {
+    Ext.Msg.alert('Error', '请先选择条件');
+  }
+}, back:function(btn) {
+  Ext.getCmp('myPie').hide();
+  Ext.getCmp('repoCloumn').show();
+}});
+Ext.define('Admin.view.stock.StockViewController', {extend:Ext.app.ViewController, alias:'controller.stockViewController', openAddWindow:function(btn, rowIndex, colIndex) {
+  var grid = btn.up('gridpanel');
+  var selModel = grid.getSelectionModel();
+  if (selModel.hasSelection()) {
+    Ext.Msg.confirm('提示', '确定要进行初始化操作吗？', function(button) {
+      if (button == 'yes') {
+        var rows = selModel.getSelection();
+        var selectIds = [];
+        Ext.each(rows, function(row) {
+          selectIds.push(row.data.id);
+        });
+        Ext.Ajax.request({url:'/stock/initRepo', method:'post', params:{ids:selectIds}, success:function(response, options) {
+          var json = Ext.util.JSON.decode(response.responseText);
+          if (json.success) {
+            Ext.Msg.alert('操作成功', json.msg, function() {
+              grid.reload();
+            });
+          } else {
+            Ext.Msg.alert('操作失败', json.msg);
+          }
+        }});
+      }
+    });
+  } else {
+    Ext.Msg.alert('错误', '没有任何行被选中，无法进行初始化操作！');
+  }
+}});
+Ext.define('Admin.view.stock.StockViewModel', {extend:Ext.app.ViewModel, alias:'viewmodel.stockViewModel', stores:{stockLists:{type:'stockStroe'}}});
+Ext.define('Admin.view.tran.TranGridPanel', {extend:Ext.panel.Panel, xtype:'tranGridPanel', layout:'fit', items:[{xtype:'gridpanel', title:'商品列表', bind:'{tranLists}', scrollable:false, selModel:{type:'checkboxmodel'}, columns:[{header:'序号', dataIndex:'id', flex:0.5, sortable:true, align:'center'}, {header:'执行时间', dataIndex:'moveDate', flex:1.3, sortable:true, align:'center', renderer:Ext.util.Format.dateRenderer('Y-m-d H:i:s')}, {header:'调拨数量', dataIndex:'moveNum', flex:1, sortable:true, align:'center'}, 
+{header:'调出仓库', dataIndex:'repoFromName', flex:1, sortable:true, align:'center'}, {header:'调入仓库', dataIndex:'repoToName', flex:1, sortable:true, align:'center'}], plugins:[{ptype:'rowwidget', widget:{xtype:'grid', bind:{store:'{record.tranDetail}'}, columns:[{text:'进货详单', dataIndex:'id', width:75, align:'center'}, {text:'货物名称', dataIndex:'product', width:265, align:'center', renderer:function(value) {
+  return value.productName;
+}}, {text:'进货数量', dataIndex:'tranNum', width:265, align:'center'}]}}], forceFit:true, tbar:[{xtype:'combobox', reference:'searchFieldName', hideLabel:true, store:Ext.create('Ext.data.Store', {fields:['name', 'value'], data:[{name:'按创建时间', value:'createTime'}, {name:'按最后修改时间', value:'updateTime'}, {name:'按价格区间', value:'tranPrice'}]}), displayField:'name', valueField:'value', value:'createTime', editable:false, queryMode:'local', triggerAction:'all', emptyText:'Select a state...', width:150, listeners:{select:'searchComboboxSelectChuang'}}, 
+'-', {xtype:'datefield', hideLabel:true, editable:false, format:'Y-m-d', reference:'searchDataFieldValue1'}, {xtype:'datefield', editable:false, hideLabel:true, format:'Y-m-d', reference:'searchDataFieldValue2'}, {xtype:'textfield', hideLabel:true, reference:'searchTextFieldValue1', hidden:true}, {xtype:'textfield', hideLabel:true, reference:'searchTextFieldValue2', hidden:true}, '-', {text:'Search', iconCls:'fa fa-search', handler:'quickSearch', itemId:'searchButton'}, '-', {text:'Search More', 
+iconCls:'fa fa-search-plus', handler:'openSearchWindow'}, '-\x3e', {text:'Add', tooltip:'Add a new row', iconCls:'fa fa-plus', handler:'openAddWindow'}, '-', {text:'Removes', tooltip:'Remove the selected item', iconCls:'fa fa-trash', itemId:'brandGridPanelRemove', disabled:true, handler:'deleteMoreRows'}], dockedItems:[{xtype:'pagingtoolbar', dock:'bottom', displayInfo:true, bind:'{tranLists}'}], listeners:{selectionchange:function(selModel, selections) {
+  this.down('#brandGridPanelRemove').setDisabled(selections.length === 0);
+}}}]});
+Ext.define('Admin.view.tran.TranPanel', {extend:Ext.container.Container, xtype:'tranPanel', controller:'tranViewController', viewModel:{type:'tranViewModel'}, layout:'fit', items:[{xtype:'tranGridPanel'}]});
+Ext.define('Admin.view.tran.TranViewController', {extend:Ext.app.ViewController, alias:'controller.tranViewController', openAddWindow:function(toolbar, rowIndex, colIndex) {
+  toolbar.up('panel').up('container').add(Ext.widget('tranAddWindow')).show();
+}, openEditWindow:function(grid, rowIndex, colIndex) {
+  var record = grid.getStore().getAt(rowIndex);
+  var win = grid.up('container').add(Ext.widget('tranEditWindow'));
   win.show();
   win.down('form').getForm().loadRecord(record);
-  Ext.getCmp('imageId').setSrc('resources/images/' + record.get('stockDetailImg'));
+  Ext.getCmp('imageId').setSrc('resources/images/' + record.get('tranImg'));
   Ext.getCmp('getBrandName').setRawValue(record.get('brand').brandName);
   Ext.getCmp('getBrandName').setValue(record.get('brand').id);
 }, openSearchWindow:function(toolbar, rowIndex, colIndex) {
-  toolbar.up('panel').up('container').add(Ext.widget('stockDetailSearchWindow')).show();
+  toolbar.up('panel').up('container').add(Ext.widget('tranSearchWindow')).show();
 }, searchComboboxSelectChuang:function(combo, record, index) {
   var searchField = this.lookupReference('searchFieldName').getValue();
   if (searchField === ('createTime' || 'updateTime')) {
@@ -100420,7 +105629,7 @@ Ext.define('Admin.view.stockDetail.StockDetailViewController', {extend:Ext.app.V
     this.lookupReference('searchTextFieldValue1').hide();
     this.lookupReference('searchTextFieldValue2').hide();
   } else {
-    if (searchField === 'stockDetailPrice') {
+    if (searchField === 'tranPrice') {
       this.lookupReference('searchTextFieldValue1').show();
       this.lookupReference('searchTextFieldValue2').show();
       this.lookupReference('searchDataFieldValue1').hide();
@@ -100435,13 +105644,13 @@ Ext.define('Admin.view.stockDetail.StockDetailViewController', {extend:Ext.app.V
     this.lookupReference('searchTextValue3').hide();
     this.lookupReference('searchTextValue4').hide();
   } else {
-    if (searchField === 'stockDetailName') {
+    if (searchField === 'tranName') {
       this.lookupReference('searchTextValue2').show();
       this.lookupReference('searchTextValue1').hide();
       this.lookupReference('searchTextValue3').hide();
       this.lookupReference('searchTextValue4').hide();
     } else {
-      if (searchField === 'stockDetailNum') {
+      if (searchField === 'tranNum') {
         this.lookupReference('searchTextValue4').show();
         this.lookupReference('searchTextValue1').hide();
         this.lookupReference('searchTextValue2').hide();
@@ -100459,15 +105668,15 @@ Ext.define('Admin.view.stockDetail.StockDetailViewController', {extend:Ext.app.V
 }, submitAddForm:function(btn) {
   var win = btn.up('window');
   var form = win.down('form');
-  var record = Ext.create('Admin.model.stockDetail.StockDetailModel');
+  var record = Ext.create('Admin.model.tran.TranModel');
   var values = form.getValues();
   record.set(values);
   record.save();
-  Ext.data.StoreManager.lookup('stockDetailStroe').load();
+  Ext.data.StoreManager.lookup('tranStroe').load();
   win.close();
 }, submitEditForm:function(btn) {
   var form = btn.up('window').down('form');
-  form.getForm().submit({url:'stockDetail/upload', method:'POST', waitMsg:'正在上传，请耐心等待....', success:function(form, action) {
+  form.getForm().submit({url:'tran/upload', method:'POST', waitMsg:'正在上传，请耐心等待....', success:function(form, action) {
     Ext.Msg.alert('Success', action.result.msg, function() {
       btn.up('window').close();
       Ext.data.StoreManager.lookup('processDefinitionStroe').load();
@@ -100483,12 +105692,12 @@ Ext.define('Admin.view.stockDetail.StockDetailViewController', {extend:Ext.app.V
   var searchTextFieldValue1 = this.lookupReference('searchTextFieldValue1').getValue();
   var searchTextFieldValue2 = this.lookupReference('searchTextFieldValue2').getValue();
   var myArray = new Array;
-  if (searchField == 'stockDetailPrice') {
+  if (searchField == 'tranPrice') {
     if ((searchTextFieldValue1 && searchTextFieldValue2) != null) {
       myArray[0] = searchTextFieldValue1;
       myArray[1] = searchTextFieldValue2;
       myArray[2] = searchField;
-      store.proxy.url = '/stockDetail/quicksearch';
+      store.proxy.url = '/tran/quicksearch';
       Ext.apply(store.proxy.extraParams, {myArray:myArray});
       store.load({params:{start:0, limit:10, page:1}});
     } else {
@@ -100501,7 +105710,7 @@ Ext.define('Admin.view.stockDetail.StockDetailViewController', {extend:Ext.app.V
       myArray[0] = searchDataFieldValue1;
       myArray[1] = searchDataFieldValue2;
       myArray[2] = searchField;
-      store.proxy.url = '/stockDetail/quicksearch';
+      store.proxy.url = '/tran/quicksearch';
       Ext.apply(store.proxy.extraParams, {myArray:myArray});
       store.load({params:{start:0, limit:10, page:1}});
     } else {
@@ -100510,7 +105719,7 @@ Ext.define('Admin.view.stockDetail.StockDetailViewController', {extend:Ext.app.V
   }
 }, submitSearchForm:function(btn) {
   var win = btn.up('window');
-  var store = Ext.data.StoreManager.lookup('stockDetailStroe');
+  var store = Ext.data.StoreManager.lookup('tranStroe');
   var searchWindowField = this.lookupReference('searchWindowField').getValue();
   var searchTextValue1 = this.lookupReference('searchTextValue1').getValue();
   var searchTextValue2 = this.lookupReference('searchTextValue2').getValue();
@@ -100521,12 +105730,12 @@ Ext.define('Admin.view.stockDetail.StockDetailViewController', {extend:Ext.app.V
     toSubmit[0] = 'id';
     toSubmit[1] = searchTextValue1;
   } else {
-    if (searchWindowField === 'stockDetailName') {
-      toSubmit[0] = 'stockDetailName';
+    if (searchWindowField === 'tranName') {
+      toSubmit[0] = 'tranName';
       toSubmit[1] = searchTextValue2;
     } else {
-      if (searchWindowField === 'stockDetailNum') {
-        toSubmit[0] = 'stockDetailNum';
+      if (searchWindowField === 'tranNum') {
+        toSubmit[0] = 'tranNum';
         toSubmit[1] = searchTextValue4;
       } else {
         if (searchWindowField === 'getBrandName') {
@@ -100536,7 +105745,7 @@ Ext.define('Admin.view.stockDetail.StockDetailViewController', {extend:Ext.app.V
       }
     }
   }
-  store.proxy.url = '/stockDetail/moresearch';
+  store.proxy.url = '/tran/moresearch';
   Ext.apply(store.proxy.extraParams, {toSubmit:toSubmit});
   store.load({params:{start:0, limit:10, page:1}});
   win.close();
@@ -100559,7 +105768,7 @@ Ext.define('Admin.view.stockDetail.StockDetailViewController', {extend:Ext.app.V
         Ext.each(rows, function(row) {
           selectIds.push(row.data.id);
         });
-        Ext.Ajax.request({url:'/stockDetail/deletes', method:'post', params:{ids:selectIds}, success:function(response, options) {
+        Ext.Ajax.request({url:'/tran/deletes', method:'post', params:{ids:selectIds}, success:function(response, options) {
           var json = Ext.util.JSON.decode(response.responseText);
           if (json.success) {
             Ext.Msg.alert('操作成功', json.msg, function() {
@@ -100589,53 +105798,5 @@ Ext.define('Admin.view.stockDetail.StockDetailViewController', {extend:Ext.app.V
 }, cancelLeaveProcess:function(grid, rowIndex, colIndex) {
   Ext.Msg.alert('Title', 'Cancel Leave Process');
 }});
-Ext.define('Admin.view.stockDetail.StockDetailViewModel', {extend:Ext.app.ViewModel, alias:'viewmodel.stockDetailViewModel', stores:{stockDetailLists:{type:'stockDetailStroe'}}});
-Ext.define('Admin.view.stock.StockGridPanel', {extend:Ext.panel.Panel, xtype:'stockGridPanel', layout:'fit', items:[{xtype:'gridpanel', title:'仓库列表', bind:'{stockLists}', scrollable:false, selModel:{type:'checkboxmodel'}, columns:[{header:'序号', dataIndex:'id', flex:0.5, sortable:true, align:'center'}, {header:'创建时间', dataIndex:'createTime', flex:1.3, sortable:true, align:'center', renderer:Ext.util.Format.dateRenderer('Y-m-d H:i:s')}, {header:'最后修改时间', dataIndex:'updateTime', flex:1.3, sortable:true, 
-align:'center', renderer:Ext.util.Format.dateRenderer('Y-m-d H:i:s')}, {header:'商品图片', dataIndex:'productImg', flex:1.2, sortable:true, renderer:function(value) {
-  return "\x3cimg src\x3d'resources/images/" + value + "' alt\x3d'' height\x3d'40px' width\x3d'40px'\x3e";
-}, align:'center'}, {header:'商品名称', dataIndex:'productName', flex:1.2, sortable:true, align:'center'}, {header:'商品编号', dataIndex:'productNum', flex:1, sortable:true, align:'center'}, {header:'商品价格', dataIndex:'productPrice', flex:1, sortable:true, align:'center'}, {header:'状态', dataIndex:'status', flex:0.6, sortable:true, align:'center', renderer:function(value) {
-  if (value == '0') {
-    return '下架';
-  } else {
-    return '在售';
-  }
-}}, {header:'商品品牌', dataIndex:'brand', flex:1, align:'center', renderer:function(value) {
-  return value.brandName;
-}}, {header:'商品品牌值', dataIndex:'brandName1', align:'center', hidden:true}, {xtype:'actioncolumn', cls:'content-column', flex:0.8, text:'Actions', align:'center', tooltip:'tool ', items:[{xtype:'button', iconCls:'x-fa fa-pencil', handler:'openEditWindow'}, {xtype:'button', iconCls:'x-fa fa-close', handler:'deleteOneRow'}]}], forceFit:true, tbar:[{xtype:'combobox', reference:'searchFieldName', hideLabel:true, store:Ext.create('Ext.data.Store', {fields:['name', 'value'], data:[{name:'按创建时间', value:'createTime'}, 
-{name:'按最后修改时间', value:'updateTime'}, {name:'按价格区间', value:'productPrice'}]}), displayField:'name', valueField:'value', value:'createTime', editable:false, queryMode:'local', triggerAction:'all', emptyText:'Select a state...', width:150, listeners:{select:'searchComboboxSelectChuang'}}, '-', {xtype:'datefield', hideLabel:true, editable:false, format:'Y-m-d', reference:'searchDataFieldValue1'}, {xtype:'datefield', editable:false, hideLabel:true, format:'Y-m-d', reference:'searchDataFieldValue2'}, 
-{xtype:'textfield', hideLabel:true, reference:'searchTextFieldValue1', hidden:true}, {xtype:'textfield', hideLabel:true, reference:'searchTextFieldValue2', hidden:true}, '-', {text:'Search', iconCls:'fa fa-search', handler:'quickSearch', itemId:'searchButton'}, '-', {text:'Search More', iconCls:'fa fa-search-plus', handler:'openSearchWindow'}, '-\x3e', {text:'Add', tooltip:'Add a new row', iconCls:'fa fa-plus', handler:'openAddWindow'}, '-', {text:'Removes', tooltip:'Remove the selected item', iconCls:'fa fa-trash', 
-itemId:'brandGridPanelRemove', disabled:true, handler:'deleteMoreRows'}], dockedItems:[{xtype:'pagingtoolbar', dock:'bottom', displayInfo:true, bind:'{productLists}'}], listeners:{selectionchange:function(selModel, selections) {
-  this.down('#brandGridPanelRemove').setDisabled(selections.length === 0);
-}}}]});
-Ext.define('Admin.view.stock.StockPanel', {extend:Ext.container.Container, xtype:'stockPanel', controller:'stockViewController', layout:'fit', items:[{xtype:'stockGridPanel'}]});
-Ext.define('Admin.view.stock.StockPiePanel', {extend:Ext.panel.Panel, xtype:'stockPiePanel', cls:'service-type shadow', height:320, bodyPadding:15, title:'Services', layout:{type:'hbox', align:'stretch'}, items:[{xtype:'container', width:300, defaults:{height:300, insetPadding:'7.5 7.5 7.5 7.5', background:'rgba(255, 255, 255, 1)', colors:['#6aa5dc', '#fdbf00', '#EE6363'], store:new Ext.data.Store({fields:['name', 'value'], proxy:new Ext.data.HttpProxy({url:'stock/getPie'}), reader:new Ext.data.JsonReader({rootProperty:''}, 
-[]), autoLoad:true}), series:[{type:'pie', label:{field:'name', display:'rotate', contrast:true, font:'12px Arial'}, useDarkerStrokeColor:true, xField:'value', donut:10, padding:0}], interactions:[{type:'rotate'}]}, items:[{xtype:'polar'}]}]});
-Ext.define('Admin.view.stock.StockViewController', {extend:Ext.app.ViewController, alias:'controller.stockViewController', onRefreshToggle:function(tool, e, owner) {
-  var store, runner;
-  if (tool.toggleValue) {
-    this.clearChartUpdates();
-  } else {
-    store = this.getStore('networkData');
-    if (store.getCount()) {
-      runner = this.chartTaskRunner;
-      if (!runner) {
-        this.chartTaskRunner = runner = new Ext.util.TaskRunner;
-      }
-      runner.start({interval:200, run:function() {
-        var rec = store.first();
-        store.remove(rec);
-        store.add(rec);
-      }});
-    }
-  }
-  tool.toggleValue = !tool.toggleValue;
-}, clearChartUpdates:function() {
-  this.chartTaskRunner = Ext.destroy(this.chartTaskRunner);
-}, destroy:function() {
-  this.clearChartUpdates();
-  this.callParent();
-}, onHideView:function() {
-  this.clearChartUpdates();
-}});
-Ext.define('Admin.view.stock.StockViewModel', {extend:Ext.app.ViewModel, alias:'viewmodel.stockViewModel', stores:{stockLists:{type:'stockStroe'}}});
+Ext.define('Admin.view.tran.TranViewModel', {extend:Ext.app.ViewModel, alias:'viewmodel.tranViewModel', stores:{tranLists:{type:'tranStore'}}});
 Ext.application({extend:Admin.Application, name:'Admin', mainView:'Admin.view.main.Main'});

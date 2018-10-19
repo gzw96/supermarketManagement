@@ -1,7 +1,7 @@
-Ext.define('Admin.store.product.ProductStroe', {
+Ext.define('Admin.store.product.ProductStore', {
 	extend: 'Ext.data.Store',
-	storeId:'productStroe',
-	alias: 'store.productStroe',
+	storeId:'productStore',
+	alias: 'store.productStore',
 	model:'Admin.model.product.ProductModel',
 	proxy: {
 		type: 'rest',

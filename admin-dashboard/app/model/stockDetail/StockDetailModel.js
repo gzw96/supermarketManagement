@@ -4,9 +4,9 @@ Ext.define('Admin.model.stockDetail.StockDetailModel', {
 		'Ext.data.proxy.Rest'
 	],
 	fields: [
-		{type:'int',name:'id'}
-		,{type:'string',name:'stockName'}	
-		,{type:'string',name:'stockNum'}
+		 {type:'int',name:'id'}
+		,{type:'string',name:'repoId',mapping:'repo.id'}	
+		,{type:'string',name:'repoName',mapping:'repo.repoName'}
 		,{type:'string',name:'stockImg'}
 		,{type:'float',name:'stockPrice'}
 		,{type:'string',name:'status'}
@@ -16,6 +16,6 @@ Ext.define('Admin.model.stockDetail.StockDetailModel', {
 	],
 	proxy: {
 		type: 'rest',
-		url: '/stockDetail',
+		url: '/stockDetail/getPurchase',
 	}
 });

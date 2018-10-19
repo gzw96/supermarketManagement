@@ -2544,6 +2544,10 @@ the height of a multi-line element */
 .x-keyboard-mode .x-grid-checkcolumn-cell-inner :focus {
     outline: 1px solid #51d3d3;
 }
+/* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/classic/theme-base/sass/src/grid/feature/RowBody.scss:1 */
+.x-grid-row-body-hidden {
+    display: none;
+}
 /* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/classic/theme-base/sass/src/menu/Menu.scss:1 */
 .x-menu {
     outline: none;
@@ -2679,6 +2683,24 @@ the height of a multi-line element */
 .x-grid-inner-locked.x-border-region-slide-in > .x-panel-bodyWrap > .x-grid-body > .x-grid-view,
 .x-grid-inner-locked.x-border-region-slide-in > .x-panel-bodyWrap > .x-grid-body > .x-tree-view {
     overflow-y: hidden !important;
+}
+/* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/classic/theme-base/sass/src/grid/plugin/RowExpander.scss:1 */
+.x-grid-row-expander {
+    font-size: 0;
+    line-height: 0;
+    text-align: center;
+}
+/* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/classic/theme-base/sass/src/grid/plugin/RowExpander.scss:8 */
+.x-keyboard-mode .x-grid-row-expander:focus {
+    outline: 1px solid #51d3d3;
+}
+/* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/classic/theme-base/sass/src/grid/plugin/RowExpander.scss:13 */
+.x-grid-hide-row-expander-spacer .x-grid-row-expander-spacer {
+    display: none;
+}
+/* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/classic/theme-base/sass/src/grid/plugin/RowExpander.scss:17 */
+.x-grid-row-expander-spacer {
+    border: 0 none;
 }
 /* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/classic/theme-base/sass/src/layout/container/Absolute.scss:1 */
 .x-abs-layout-ct {
@@ -11265,6 +11287,11 @@ a.x-monthpicker-yearnav-button:hover {
 .x-gecko .x-selmodel-checkbox .x-grid-checkcolumn {
     pointer-events: none;
 }
+/* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/classic/theme-neutral/sass/src/grid/feature/RowBody.scss:1 */
+.x-grid-rowbody {
+    font: 400 13px/19px 'Open Sans', 'Helvetica Neue', helvetica, arial, verdana, sans-serif;
+    padding: 5px 10px 5px 10px;
+}
 /* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/classic/theme-neutral/sass/var/menu/Menu.scss:818 */
 .x-menu-default {
     border-style: solid;
@@ -11892,6 +11919,30 @@ a.x-monthpicker-yearnav-button:hover {
 /* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/classic/theme-neutral/sass/src/grid/locking/Lockable.scss:123 */
 .x-grid-scroll-container {
     background-color: #fff;
+}
+/* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/classic/theme-neutral/sass/src/grid/plugin/RowExpander.scss:1 */
+.x-grid-cell-inner-row-expander {
+    padding: 8px 8px 8px 8px;
+}
+/* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/classic/theme-neutral/sass/src/grid/plugin/RowExpander.scss:16 */
+.x-grid-row-expander {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    color: #919191;
+    font: 14px/1 FontAwesome;
+}
+/* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/classic/theme-neutral/sass/etc/mixins/font-icon.scss:132 */
+.x-grid-row-expander:before {
+    content: "\f146";
+}
+/* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/classic/theme-neutral/sass/src/grid/plugin/RowExpander.scss:31 */
+.x-grid-row-collapsed .x-grid-row-expander {
+    font: 14px/1 FontAwesome;
+}
+/* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/classic/theme-neutral/sass/etc/mixins/font-icon.scss:132 */
+.x-grid-row-collapsed .x-grid-row-expander:before {
+    content: "\f0fe";
 }
 /* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/classic/theme-neutral/sass/src/layout/container/Form.scss:1 */
 .x-form-layout-wrap {
@@ -15718,63 +15769,4 @@ a.x-monthpicker-yearnav-button:hover {
 .fa-spin {
     -webkit-animation: fa-spin 2s infinite linear;
     animation: fa-spin 2s infinite linear;
-}
-/* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/packages/font-awesome/sass/etc/_animated.scss:9 */
-.fa-pulse {
-    -webkit-animation: fa-spin 1s infinite steps(8);
-    animation: fa-spin 1s infinite steps(8);
-}
-/* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/packages/font-awesome/sass/etc/_animated.scss:14 */
-@-webkit-keyframes fa-spin {
-    /* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/packages/font-awesome/sass/etc/_animated.scss:15 */
-    0% {
-        -webkit-transform: rotate(0deg);
-        transform: rotate(0deg);
-    }
-    /* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/packages/font-awesome/sass/etc/_animated.scss:19 */
-    100% {
-        -webkit-transform: rotate(359deg);
-        transform: rotate(359deg);
-    }
-}
-/* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/packages/font-awesome/sass/etc/_animated.scss:25 */
-@keyframes fa-spin {
-    /* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/packages/font-awesome/sass/etc/_animated.scss:26 */
-    0% {
-        -webkit-transform: rotate(0deg);
-        transform: rotate(0deg);
-    }
-    /* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/packages/font-awesome/sass/etc/_animated.scss:30 */
-    100% {
-        -webkit-transform: rotate(359deg);
-        transform: rotate(359deg);
-    }
-}
-/* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/packages/font-awesome/sass/etc/_rotated-flipped.scss:4 */
-.fa-rotate-90 {
-    -ms-filter: "progid:DXImageTransform.Microsoft.BasicImage(rotation=1)";
-    -webkit-transform: rotate(90deg);
-    -ms-transform: rotate(90deg);
-    transform: rotate(90deg);
-}
-/* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/packages/font-awesome/sass/etc/_rotated-flipped.scss:5 */
-.fa-rotate-180 {
-    -ms-filter: "progid:DXImageTransform.Microsoft.BasicImage(rotation=2)";
-    -webkit-transform: rotate(180deg);
-    -ms-transform: rotate(180deg);
-    transform: rotate(180deg);
-}
-/* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/packages/font-awesome/sass/etc/_rotated-flipped.scss:6 */
-.fa-rotate-270 {
-    -ms-filter: "progid:DXImageTransform.Microsoft.BasicImage(rotation=3)";
-    -webkit-transform: rotate(270deg);
-    -ms-transform: rotate(270deg);
-    transform: rotate(270deg);
-}
-/* C:/Users/Administrator/git/supermarketManagement/admin-dashboard/ext/packages/font-awesome/sass/etc/_rotated-flipped.scss:8 */
-.fa-flip-horizontal {
-    -ms-filter: "progid:DXImageTransform.Microsoft.BasicImage(rotation=0, mirror=1)";
-    -webkit-transform: scale(-1, 1);
-    -ms-transform: scale(-1, 1);
-    transform: scale(-1, 1);
 }

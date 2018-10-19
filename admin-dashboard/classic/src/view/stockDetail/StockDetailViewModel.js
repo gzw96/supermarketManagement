@@ -11,6 +11,6 @@ Ext.define('Admin.view.stockDetail.StockDetailViewModel', {
         'Ext.data.reader.Json'
     ],
     stores: {
-        stockDetailLists: {type: 'stockDetailStroe'}
+        stockDetailLists: {type: 'stockDetailStore'}
     }
 });

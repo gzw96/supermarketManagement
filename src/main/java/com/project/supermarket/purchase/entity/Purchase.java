@@ -26,6 +26,7 @@ public class Purchase {
 	private String method;
 	private Date purchaseTime;
 	private String remark;
+	private String type;
 	//foreignkey
 	private Supplier supplier;
 	private Repo repo;
@@ -37,17 +38,20 @@ public class Purchase {
 		return id;
 	}
 	
-	@Column(nullable=false,unique=true)
+	
 	public Long getPurchaseNum() {
 		return purchaseNum;
 	}
 	
-	@Column(nullable=false)
 	public double getStatement() {
 		return statement;
 	}
 	
-	@Column(nullable=false)
+	
+	public String getType() {
+		return type;
+	}
+	@Column(nullable=true)
 	public double getPayment() {
 		return payment;
 	}
@@ -108,6 +112,11 @@ public class Purchase {
 	public void setRemark(String remark) {
 		this.remark = remark;
 	}
+
+	public void setType(String type) {
+		this.type = type;
+	}
+
 
 	public void setSupplier(Supplier supplier) {
 		this.supplier = supplier;

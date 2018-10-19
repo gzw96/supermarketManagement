@@ -37,7 +37,7 @@ public class StockDetail {
 	private Stock stock;
 	
 	@ManyToOne(cascade= {CascadeType.MERGE,CascadeType.REFRESH})
-	private Product product=new Product();
+	private Product product;
 	
 	private int num;   //商品数量
 

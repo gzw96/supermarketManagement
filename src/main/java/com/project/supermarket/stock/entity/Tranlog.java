@@ -1,7 +1,10 @@
 package com.project.supermarket.stock.entity;
 
 import java.util.Date;
+import java.util.HashSet;
+import java.util.Set;
 
+import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
@@ -9,69 +12,56 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
+import javax.persistence.OneToMany;
 import javax.persistence.Table;
+import javax.persistence.Temporal;
+import javax.persistence.TemporalType;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.project.supermarket.management.repo.entity.Repo;
 import com.project.supermarket.user.entity.User;
 
 @Entity
-@Table(name="transhipment")
-public class Transhipment {
-	private Long id;
-	private Long tranId;
-	private Repo repoFrom;
-	private Repo repoTo;
-	private Long moveNum;
-	private Date moveDate;
-	private User tranPeople;
-	
+@Table(name="tranlog")
+@JsonIgnoreProperties(value={"tranDetail"})
+public class Tranlog {
 	@Id
-	@GeneratedValue(strategy=GenerationType.IDENTITY)
+    @GeneratedValue(strategy=GenerationType.IDENTITY)
+	private Long id;
+	@ManyToOne(cascade= {CascadeType.ALL})
+	private Repo repoFrom;
+	@ManyToOne(cascade= {CascadeType.ALL})
+	private Repo repoTo;
+	private int moveNum;
+	@Temporal(TemporalType.TIMESTAMP)
+    @JsonFormat(pattern="yyyy-MM-dd HH:mm:ss",timezone="GMT+8")
+	private Date moveDate;
+	@OneToMany(cascade= {CascadeType.ALL},mappedBy="tranlog")
+	private Set<TranDetail> tranDetail = new HashSet<TranDetail>();//外键,一对多 
+	
 	public Long getId() {
 		return id;
 	}
-	
-	@Column(nullable=false)
-	public Long getTranId() {
-		return tranId;
-	}
-	
-	@ManyToOne
-	@JoinColumn(name="repoFrom")
 	public Repo getRepoFrom() {
 		return repoFrom;
 	}
-	
-	@ManyToOne
-	@JoinColumn(name="repoTo")
 	public Repo getRepoTo() {
 		return repoTo;
 	}
-	
-	@Column(nullable=false)
-	public Long getMoveNum() {
+	public int getMoveNum() {
 		return moveNum;
 	}
-	
-	@Column(nullable=false)
-	@JsonFormat(pattern="yyyy/MM/dd HH:mm:ss",timezone="GMT+8")
 	public Date getMoveDate() {
 		return moveDate;
 	}
-	
-	@ManyToOne
-	@JoinColumn(name="tranPeopleId")
-	public User getTranPeople() {
-		return tranPeople;
+	public Set<TranDetail> getTranDetail() {
+		return tranDetail;
 	}
 	
-	//setter
+	
 	public void setId(Long id) {
 		this.id = id;
-	}
-	public void setTranId(Long tranId) {
-		this.tranId = tranId;
 	}
 	public void setRepoFrom(Repo repoFrom) {
 		this.repoFrom = repoFrom;
@@ -79,15 +69,17 @@ public class Transhipment {
 	public void setRepoTo(Repo repoTo) {
 		this.repoTo = repoTo;
 	}
-	public void setMoveNum(Long moveNum) {
+	public void setMoveNum(int moveNum) {
 		this.moveNum = moveNum;
 	}
 	public void setMoveDate(Date moveDate) {
 		this.moveDate = moveDate;
 	}
-	public void setTranPeople(User tranPeople) {
-		this.tranPeople = tranPeople;
+	public void setTranDetail(Set<TranDetail> tranDetail) {
+		this.tranDetail = tranDetail;
 	}
+	
+	
 	
 	
 }

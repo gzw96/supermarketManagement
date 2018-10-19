@@ -11,6 +11,6 @@ Ext.define('Admin.view.product.ProductViewModel', {
         'Ext.data.reader.Json'
     ],
     stores: {
-        productLists: {type: 'productStroe'}
+        productLists: {type: 'productStore'}
     }
 });
