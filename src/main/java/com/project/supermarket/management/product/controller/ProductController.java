@@ -55,7 +55,11 @@ public class ProductController
     }
 	
 	@RequestMapping(value = "/upload")
-    public @ResponseBody ExtAjaxResponse deploy(@RequestParam(value = "productPrice") Double productPrice,@RequestParam(value = "status") String status,@RequestParam(value = "getBrandName") String getBrandName,@RequestParam(value = "id") Long id,@RequestParam(value = "productName") String productName,@RequestParam(value = "productImg") MultipartFile file) {
+    public @ResponseBody ExtAjaxResponse deploy(@RequestParam(value = "productPrice") Double productPrice,
+			@RequestParam(value = "status") String status,@RequestParam(value = "getBrandName") String getBrandName,
+			@RequestParam(value = "id") Long id,@RequestParam(value = "productName") String productName,
+			@RequestParam(value = "productImg") MultipartFile file,@RequestParam(value = "mass") Double mass,
+			@RequestParam(value = "volume") Double volume) {
         try {
         	long l=Long.parseLong(getBrandName);
         	SimpleDateFormat fromat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss"); 
@@ -75,6 +79,8 @@ public class ProductController
 				entity.setStatus(status);
 				entity.setProductName(productName);
 				entity.setGetBrandName(l);
+				entity.setMass(mass);
+				entity.setVolume(volume);
 				productService.save(entity);
 			}
     		return new ExtAjaxResponse(true,"更新成功!");

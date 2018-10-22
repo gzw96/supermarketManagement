@@ -13,6 +13,7 @@ import javax.persistence.Id;
 import javax.persistence.ManyToMany;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
+import javax.persistence.OneToOne;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 import javax.persistence.Transient;
@@ -41,6 +42,8 @@ public class Product{
 	@Temporal(TemporalType.TIMESTAMP)
     @JsonFormat(pattern="yyyy-MM-dd HH:mm:ss",timezone="GMT+8")
 	private Date updateTime;				//最后一次修改时间
+	private Double mass;                    //质量
+	private Double volume ;                 //体积
 	
 	@OneToMany(cascade= {CascadeType.MERGE,CascadeType.REFRESH} ,mappedBy="product",fetch=FetchType.LAZY)
 	private Set<StockDetail> stockDetail = new HashSet<StockDetail>();//外键,多对多 
@@ -84,11 +87,24 @@ public class Product{
 	public Long getGetBrandName() {
 		return getBrandName;
 	}
-	
 	public Set<StockDetail> getStockDetail() {
 		return stockDetail;
 	}
 	
+	public Double getMass() {
+		return mass;
+	}
+	public Double getVolume() {
+		return volume;
+	}
+	
+	
+	public void setMass(Double mass) {
+		this.mass = mass;
+	}
+	public void setVolume(Double volume) {
+		this.volume = volume;
+	}
 	public void setId(Long id) {
 		this.id = id;
 	}
