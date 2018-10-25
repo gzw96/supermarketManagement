@@ -69,7 +69,7 @@ public class PurchaseDetailService implements PurchaseDetailServiceImpl{
 	}
 
 	@Override
-	public List<Product> findAllProduct() {
+	public List<String> findAllProduct() {
 		// TODO Auto-generated method stub
 		return purchaseDetailRepository.findAllProduct();
 	}

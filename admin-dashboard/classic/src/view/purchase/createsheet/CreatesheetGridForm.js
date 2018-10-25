@@ -43,7 +43,7 @@ Ext.define('Admin.view.purchase.createsheet.CreatesheetGridForm', {
             },
             store: Ext.create('Ext.data.Store', {  // 下拉列表显示的数据源
                 autoSync: true,
-                fields: ['id', 'productName', 'productNum', 'format', 'retailPrice'],
+                fields: ['id', 'productName', 'productNum', 'productPrice'],
                 proxy: {
                     type: 'ajax',
                     url: 'purchasedetail/getproductnums',

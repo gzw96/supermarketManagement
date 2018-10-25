@@ -21,7 +21,7 @@ public interface PurchaseDetailServiceImpl {
 	public void deleteAll(Long[] ids);
 	
 	//
-	public List<Product> findAllProduct();
+	public List<String> findAllProduct();
 	public void updatePurchaseRepo(Long newProductId,Long oldProductId);
 	public Long getProductIdByProductNum(Long productNum);
 }

@@ -16,6 +16,8 @@ import javax.persistence.JoinColumn;
 import javax.persistence.JoinTable;
 import javax.persistence.ManyToMany;
 import javax.persistence.Table;
+import javax.persistence.Temporal;
+import javax.persistence.TemporalType;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -23,9 +25,10 @@ import com.project.supermarket.common.bean.Sex;
 import com.project.supermarket.common.bean.Status;
 
 @Entity
-@Table(name="user")
+@Table(name="act_id_user")
 public class User {
-	private Long id;
+	
+	private String id;
 	private String userName;
 	private String userRealName;
 	private String password;
@@ -39,12 +42,12 @@ public class User {
 	private Set<Role> role;
 	
 	@Id
-	@GeneratedValue(strategy=GenerationType.IDENTITY)
-	public Long getId() {
+	@Column(name = "ID_")
+	public String getId() {
 		return id;
 	}
 	
-	@Column(nullable=false,unique=true)
+	@Column(unique=true)
 	public String getUserName() {
 		return userName;
 	}
@@ -54,7 +57,7 @@ public class User {
 		return userRealName;
 	}
 	
-	@Column(nullable=false)
+	@Column(name = "PWD_",nullable=false)
 	public String getPassword() {
 		return password;
 	}
@@ -79,6 +82,7 @@ public class User {
 		return workNum;
 	}
 	
+	@Temporal(TemporalType.DATE)
 	@JsonFormat(pattern="yyyy/MM/dd",timezone="GMT+8")
 	public Date getEnterDate() {
 		return enterDate;
@@ -94,19 +98,20 @@ public class User {
 		return status;
 	}
 
-	@ManyToMany(cascade=CascadeType.ALL,fetch=FetchType.EAGER)
+	@ManyToMany(fetch=FetchType.EAGER)
     @JoinTable(
-    		name="membership",
-            joinColumns=@JoinColumn(name="userId"),
-            inverseJoinColumns=@JoinColumn(name="roleId")
+    		name="act_id_membership",
+            joinColumns=@JoinColumn(name="USER_ID_"),
+            inverseJoinColumns=@JoinColumn(name="GROUP_ID_")
     )    
+	//@JsonIgnore
 	public Set<Role> getRole() {
 		return role;
 	}
 
 	
 	//setter
-	public void setId(Long id) {
+	public void setId(String id) {
 		this.id = id;
 	}
 

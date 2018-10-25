@@ -1,3 +1,4 @@
+var userName;
 Ext.define('Admin.Application', {
     extend: 'Ext.app.Application',
 
@@ -7,7 +8,7 @@ Ext.define('Admin.Application', {
         'NavigationTree'
     ],
 
-    defaultToken: 'admindashboard',
+    defaultToken: 'login',
 
     // The name of the initial view to create. This class will gain a "viewport" plugin
     // if it does not extend Ext.Viewport.

@@ -5,12 +5,18 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+import com.project.supermarket.management.product.entity.Product;
 import com.project.supermarket.management.repo.entity.Repo;
 import com.project.supermarket.management.repo.entity.RepoQueryDTO;
 import com.project.supermarket.management.repo.repository.RepoRepository;
@@ -57,7 +63,12 @@ public class RepoService implements RepoServiceImpl{
 		// TODO Auto-generated method stub
 		return repoRepository.findAll(spec, pageable);
 	}
-
+	
+	@Override
+	public List<RepoQueryDTO> findAll(Specification<RepoQueryDTO> spec){
+		return repoRepository.findAll(spec);
+	}
+	
 	@Override
 	public void deleteAll(Long[] ids) {
 		// TODO Auto-generated method stub
@@ -69,19 +80,19 @@ public class RepoService implements RepoServiceImpl{
 	}
 
 	@Override
-	public Long getRepoUserId(String userName,Long workNum) {
+	public String getRepoUserId(String userName,Long workNum) {
 		// TODO Auto-generated method stub
 		return repoRepository.getRepoUserId(userName,workNum);
 	}
 
 	@Override
-	public void findUserById(Long userid, String repoName) {
+	public void findUserById(String userid, String repoName) {
 		// TODO Auto-generated method stub
 		repoRepository.findUserById(userid, repoName);
 	}
 
 	@Override
-	public void updateRoleById(Long userid, Long repoId) {
+	public void updateRoleById(String userid, Long repoId) {
 		// TODO Auto-generated method stub
 		repoRepository.updateRoleById(userid, repoId);
 	}
@@ -92,4 +103,43 @@ public class RepoService implements RepoServiceImpl{
 		return repoRepository.findAllActiveUserRealName();
 	}
 
+	@Override
+	public Specification<RepoQueryDTO> getNeedinit() {
+		return new Specification<RepoQueryDTO>() {
+			@Override
+			public Predicate toPredicate(Root<RepoQueryDTO> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) {
+				List<Predicate> predicate = new ArrayList<>();
+				predicate.add(criteriaBuilder.isNull(root.get("stock")));
+				Predicate[] pre = new Predicate[predicate.size()];
+				return query.where(predicate.toArray(pre)).getRestriction();
+			}
+		};
+	}
+	
+	@Override
+	public Specification<RepoQueryDTO> getRepo() {
+		return new Specification<RepoQueryDTO>() {
+			@Override
+			public Predicate toPredicate(Root<RepoQueryDTO> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) {
+				List<Predicate> predicate = new ArrayList<>();
+				predicate.add(criteriaBuilder.isNotNull(root.get("stock")));
+				Predicate[] pre = new Predicate[predicate.size()];
+				return query.where(predicate.toArray(pre)).getRestriction();
+			}
+		};
+	}
+	
+	@Override
+	public Specification<RepoQueryDTO> setRepo() {
+		return new Specification<RepoQueryDTO>() {
+			@Override
+			public Predicate toPredicate(Root<RepoQueryDTO> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) {
+				List<Predicate> predicate = new ArrayList<>();
+				predicate.add(criteriaBuilder.isNotNull(root.get("stock")));
+				predicate.add(criteriaBuilder.equal(root.get("type"),"仓库"));
+				Predicate[] pre = new Predicate[predicate.size()];
+				return query.where(predicate.toArray(pre)).getRestriction();
+			}
+		};
+	}
 }

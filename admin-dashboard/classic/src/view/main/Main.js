@@ -8,6 +8,7 @@
 
     controller: 'main',
     viewModel: 'main',
+	
 
     cls: 'sencha-dash-viewport',
     itemId: 'mainView',
@@ -20,7 +21,24 @@
     listeners: {
         render: 'onMainViewRender'
     },
-
+	listeners: {
+		afterRender:function(){
+			Ext.Ajax.request({
+				url:'finduser',
+				method:'get',
+				success: function(response,options){
+					var json = Ext.util.JSON.decode(response.responseText);
+					userName = json.map.userName;
+					if(userName!=null){
+						Ext.getCmp('loginUserName').setText(userName);
+					}else{
+						if(id!='login')
+							window.location.href="#login";
+					}
+				}
+			});
+		}
+    },
     items: [
         {
             xtype: 'toolbar',
@@ -46,18 +64,21 @@
                 {
                     iconCls:'x-fa fa-power-off',
                     ui: 'header',
-                    href: '',//修改为登录页面
+                    //href: '',//修改为登录页面
                     hrefTarget: '_self',
-                    tooltip: 'logout'
+                    tooltip: 'logout',
+					handler: 'logoutButton'
                 },
                 {
                     xtype: 'tbtext',
-                    text: '用户名:Admin',
-                    cls: 'top-user-name'
+                    text: '用户名:',
+					id:'loginUserName',
+                    cls: 'top-user-name',
                 },
                 {
                     xtype: 'image',
                     cls: 'header-right-profile-image',
+					id:'loginUserImage',
                     height: 35,
                     width: 35,
                     alt:'current user image',
@@ -98,4 +119,6 @@
             ]
         }
     ]
+	
 });
+

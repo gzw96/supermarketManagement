@@ -16,8 +16,8 @@ import com.project.supermarket.purchase.entity.PurchaseDetail;
 @Repository
 public interface PurchaseDetailRepository extends JpaSpecificationExecutor<PurchaseDetail>,PagingAndSortingRepository<PurchaseDetail, Long>{
 
-	@Query("from Product p")
-	public List<Product> findAllProduct();
+	@Query("select id,productName,productNum,productPrice from Product p")
+	public List<String> findAllProduct();
 	
 	@Query("select r.id from Product r where r.productNum = ?1")
 	public Long getProductIdByProductNum(Long productNum);

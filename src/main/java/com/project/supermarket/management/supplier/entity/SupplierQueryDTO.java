@@ -102,7 +102,7 @@ public class SupplierQueryDTO {
 				}
 				if (StringUtils.isNotBlank(supplierQueryDTO.getSupplierPeople())) {
 					predicate.add(criteriaBuilder.like(root.get("supplierPeople").as(String.class),
-							"%" + supplierQueryDTO.getSupplierName() + "%"));
+							"%" + supplierQueryDTO.getSupplierPeople() + "%"));
 				}
 				if (StringUtils.isNotBlank(supplierQueryDTO.getBankName())) {
 					predicate.add(criteriaBuilder.like(root.get("bankName").as(String.class),

@@ -141,11 +141,43 @@ Ext.define('Admin.view.main.MainController', {
 
     onMainViewRender:function() {
         if (!window.location.hash) {
-            this.redirectTo("admindashboard");
+            this.redirectTo("login");
         }
     },
 
     onRouteChange:function(id){
-        this.setCurrentView(id);
+		var me = this;
+		this.setCurrentView(id);
+		Ext.Ajax.request({
+			url:'finduser',
+			method:'get',
+			success: function(response,options){
+				var json = Ext.util.JSON.decode(response.responseText);
+				userName = json.map.userName;
+				if(userName!=null){
+					Ext.getCmp('loginUserName').setText(userName);
+				}else{
+					if(id!='login')
+						Ext.Msg.alert('警告', '请先登录',function(){window.location.href="#login";});
+				}
+			}
+		});
+    },
+	logoutButton: function(){
+		var me = this;
+        Ext.Ajax.request({
+            url: 'logout',
+            method: 'post',
+            success: function(response, options) {
+            	var json = Ext.util.JSON.decode(response.responseText);
+	            if(json.success){
+					userName = null;
+	            	me.redirectTo('login', true);
+	            	//window.location.reload();
+		        }else{
+		        	Ext.Msg.alert('登出失败', json.msg);
+		        }
+            }
+        });
     }
 });

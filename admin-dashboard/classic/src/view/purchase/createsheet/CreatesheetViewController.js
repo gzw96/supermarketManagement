@@ -25,8 +25,7 @@ Ext.define('Admin.view.purchase.createsheet.CreatesheetViewController', {
 				id: data.id,
 				productName: data.productName,
 				productNum: data.productNum,
-				format: data.format,
-				retailPrice: data.retailPrice,
+				productPrice: data.productPrice,
 			});
 		}
 		//将文本框清空

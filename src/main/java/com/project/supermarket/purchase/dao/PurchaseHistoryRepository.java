@@ -20,7 +20,7 @@ import com.project.supermarket.user.entity.User;
 public interface PurchaseHistoryRepository extends PagingAndSortingRepository<Purchase, Long>,JpaSpecificationExecutor<Purchase>{
 	//通过name找外键的id
 	@Query("select u.id from User u where u.userRealName like ?1 and u.workNum like ?2")
-	public Long getPurchaseUserId(String userRealName,Long workNum);
+	public String getPurchaseUserId(String userRealName,Long workNum);
 	
 	@Query("select r.id from Repo r where r.repoName like ?1")
 	public Long getPurchaseRepoId(String repoName);
@@ -32,7 +32,7 @@ public interface PurchaseHistoryRepository extends PagingAndSortingRepository<Pu
 	@Transactional
 	@Modifying(clearAutomatically = true)
 	@Query(value="update purchase set operator_id = ?1 where purchase_num = ?2 ",nativeQuery=true)
-	public void updatePurchaseUser(Long userid,String purchaseNum);
+	public void updatePurchaseUser(String userid,String purchaseNum);
 
 	@Transactional
 	@Modifying(clearAutomatically = true)
@@ -51,14 +51,14 @@ public interface PurchaseHistoryRepository extends PagingAndSortingRepository<Pu
 	@Query("from Supplier s where s.status = '可用' ")
 	public List<Supplier> findAllSupplier();
 	
-	@Query("from Repo r where r.status = '可用' ")
-	public List<Repo> findAllRepo();
+	@Query("select repoName from Repo r where r.status = '可用' ")
+	public List<String> findAllRepo();
 	
 	//保存外键
 	@Transactional
 	@Modifying(clearAutomatically = true)
 	@Query(value="update purchase set operator_id = ?1 where id = ?2 ",nativeQuery=true)
-	public void updateOperatorById(Long userid,Long purchaseId);
+	public void updateOperatorById(String userid,Long purchaseId);
 	
 	@Transactional
 	@Modifying(clearAutomatically = true)
@@ -73,8 +73,8 @@ public interface PurchaseHistoryRepository extends PagingAndSortingRepository<Pu
 
 	@Transactional
 	@Modifying(clearAutomatically = true)
-	@Query(value="INSERT INTO purchase (purchase_num, statement, payment, method, remark, purchase_time, operator_id, supplier_id, repo_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9);" ,nativeQuery=true)
-	public void updatePurchase(String purchaseNum,Double statement,Double payment,String method,String remark,Date date,Long userId,Long supplierId,Long repoId);
+	@Query(value="INSERT INTO purchase (purchase_num, statement, payment, method, remark, purchase_time, operator_id, supplier_id, repo_id ,type) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9,'待审批');" ,nativeQuery=true)
+	public void updatePurchase(String purchaseNum,Double statement,Double payment,String method,String remark,Date date,String userId,Long supplierId,Long repoId);
 	
 	@Transactional
 	@Modifying(clearAutomatically = true)

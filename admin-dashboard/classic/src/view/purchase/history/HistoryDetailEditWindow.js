@@ -68,22 +68,6 @@ Ext.define('Aria.view.purchase.history.HistoryDetailEditWindow', {
             id: 'empProductName'
         }, {
             xtype: 'textfield',
-            fieldLabel: '产品规格',
-            name: 'format',
-            emptyText: '此处不能为空',
-            allowBlank: false,
-            blankText: '此处不能为空',
-            id: 'format'
-        }, {
-            xtype: 'textfield',
-            fieldLabel: '产品零售价',
-            name: 'retailPrice',
-            emptyText: '此处不能为空',
-            allowBlank: false,
-            blankText: '此处不能为空',
-            id: 'retailPrice'
-        }, {
-            xtype: 'textfield',
             fieldLabel: '进货价格',
             name: 'purchasePrice',
             emptyText: '此处不能为空',

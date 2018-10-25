@@ -1,7 +1,9 @@
 package com.project.supermarket.management.repo.entity;
 
 import java.util.Date;
+import java.util.Set;
 
+import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
@@ -9,11 +11,18 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
+import javax.persistence.OneToMany;
+import javax.persistence.OneToOne;
 import javax.persistence.Table;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.project.supermarket.stock.entity.Stock;
+import com.project.supermarket.stock.entity.TranDetail;
+import com.project.supermarket.stock.entity.Tranlog;
 import com.project.supermarket.user.entity.User;
 
 @Entity
+@JsonIgnoreProperties(value={"stock"})
 @Table(name="repository")
 public class Repo {
 	private Long id;
@@ -26,6 +35,9 @@ public class Repo {
 	private String status;
 	private String type;
 	private User user;
+	private Stock stock;
+	private Set<Tranlog> tranlog;
+	
 	@Id
 	@GeneratedValue(strategy=GenerationType.IDENTITY)
 	public Long getId() {
@@ -75,10 +87,15 @@ public class Repo {
 	public User getUser() {
 		return user;
 	}
+	@OneToOne(cascade= {CascadeType.ALL})
+	public Stock getStock() {
+		return stock;
+	}
+	@OneToMany(cascade= {CascadeType.ALL})
+	public Set<Tranlog> getTranlog() {
+		return tranlog;
+	}
 
-	
-	//setter
-	
 	public void setId(Long id) {
 		this.id = id;
 	}
@@ -118,6 +135,15 @@ public class Repo {
 	public void setUser(User user) {
 		this.user = user;
 	}
+
+	public void setStock(Stock stock) {
+		this.stock = stock;
+	}
+
+	public void setTranlog(Set<Tranlog> tranlog) {
+		this.tranlog = tranlog;
+	}
+
 
 	
 	//setter

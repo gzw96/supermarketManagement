@@ -20,6 +20,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
 import com.project.supermarket.common.util.BeanUtils;
 import com.project.supermarket.common.web.ExtAjaxResponse;
 import com.project.supermarket.common.web.ExtjsPageRequest;
@@ -101,7 +103,7 @@ public class PurchaseHistoryController {
 				else if ((purchaseDTO.getUserRealName()!=null)&(purchaseDTO.getSupplierName()==null)&(purchaseDTO.getRepoName()==null)) {
 					String uName = purchaseDTO.getUserRealName();
 					Long num = purchaseDTO.getWorkNum();
-					Long uId = purchaseHistoryService.getPurchaseUserId(uName, num);
+					String uId = purchaseHistoryService.getPurchaseUserId(uName, num);
 					purchaseHistoryService.save(purchase);
 					//保存外键
 					purchaseHistoryService.updateOperatorById(uId, myId);
@@ -120,7 +122,7 @@ public class PurchaseHistoryController {
 					Long repoId = purchaseHistoryService.getPurchaseRepoId(repoName);
 					String uName = purchaseDTO.getUserRealName();
 					Long num = purchaseDTO.getWorkNum();
-					Long uId = purchaseHistoryService.getPurchaseUserId(uName, num);
+					String uId = purchaseHistoryService.getPurchaseUserId(uName, num);
 					purchaseHistoryService.save(purchase);
 					purchaseHistoryService.updateRepoById(repoId, myId);
 					purchaseHistoryService.updateOperatorById(uId, myId);
@@ -130,7 +132,7 @@ public class PurchaseHistoryController {
 					Long supplierId = purchaseHistoryService.getPurchaseSupplierId(supplierName);
 					String uName = purchaseDTO.getUserRealName();
 					Long num = purchaseDTO.getWorkNum();
-					Long uId = purchaseHistoryService.getPurchaseUserId(uName, num);
+					String uId = purchaseHistoryService.getPurchaseUserId(uName, num);
 					purchaseHistoryService.save(purchase);
 					purchaseHistoryService.updateSupplierById(supplierId, myId);
 					purchaseHistoryService.updateOperatorById(uId, myId);
@@ -140,7 +142,7 @@ public class PurchaseHistoryController {
 					Long supplierId = purchaseHistoryService.getPurchaseSupplierId(supplierName);
 					String uName = purchaseDTO.getUserRealName();
 					Long num = purchaseDTO.getWorkNum();
-					Long uId = purchaseHistoryService.getPurchaseUserId(uName, num);
+					String uId = purchaseHistoryService.getPurchaseUserId(uName, num);
 					String repoName = purchaseDTO.getRepoName();
 					Long repoId = purchaseHistoryService.getPurchaseRepoId(repoName);
 					purchaseHistoryService.save(purchase);
@@ -174,11 +176,15 @@ public class PurchaseHistoryController {
 	@RequestMapping(method=RequestMethod.POST,value="/getrepos")
 	@ResponseBody
 	public String getAllRepos() {
-		List<Repo> nameString = purchaseHistoryService.findAllRepo();
-		Map<String, Object> map = new HashMap<>();
-		map.put("root", nameString);
-		
-		String jsonString = JSON.toJSONString(map);
+		List<String> nameString = purchaseHistoryService.findAllRepo();
+		//将reponame放入json
+		JSONArray array = new JSONArray();
+		for (int i = 0; i < nameString.size(); i++) {
+			JSONObject object = new JSONObject();
+			object.put("repoName", nameString.get(i));
+			array.add(object);
+		}
+		String jsonString = array.toString();
 		return jsonString;
 	}
 	

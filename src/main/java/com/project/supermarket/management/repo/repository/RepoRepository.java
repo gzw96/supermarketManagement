@@ -20,18 +20,18 @@ import com.project.supermarket.user.entity.User;
 @Repository
 public interface RepoRepository extends JpaSpecificationExecutor<RepoQueryDTO>,PagingAndSortingRepository<Repo, Long>{
 	@Query("select u.id from User u where u.userRealName like ?1 and u.workNum like ?2")
-	public Long getRepoUserId(String userRealName,Long workNum);
+	public String getRepoUserId(String userRealName,Long workNum);
 	
 	@Transactional
 	@Modifying(clearAutomatically = true)
 	@Query(value="update repository set role_id = ?1 where repo_name = ?2 ",nativeQuery=true)
-	public void findUserById(Long userid,String repoName);
+	public void findUserById(String userid,String repoName);
 
 	
 	@Transactional
 	@Modifying(clearAutomatically = true)
 	@Query(value="update repository set role_id = ?1 where id = ?2 ",nativeQuery=true)
-	public void updateRoleById(Long userid,Long repoId);
+	public void updateRoleById(String userid,Long repoId);
 	
 	@Query("from User u where u.status = 'yes' ")
 	public List<User> findAllActiveUserRealName();

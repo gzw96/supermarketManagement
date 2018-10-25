@@ -26,6 +26,7 @@ public class Purchase {
 	private String method;
 	private Date purchaseTime;
 	private String remark;
+	private String type;
 	//foreignkey
 	private Supplier supplier;
 	private Repo repo;
@@ -80,6 +81,23 @@ public class Purchase {
 		return supplier;
 	}
 
+	
+	public String getType() {
+		return type;
+	}
+
+	public void setType(String type) {
+		this.type = type;
+	}
+
+	public void setStatement(Double statement) {
+		this.statement = statement;
+	}
+
+	public void setPayment(Double payment) {
+		this.payment = payment;
+	}
+
 	//setter
 	public void setId(Long id) {
 		this.id = id;
@@ -87,14 +105,6 @@ public class Purchase {
 
 	public void setPurchaseNum(String purchaseNum) {
 		this.purchaseNum = purchaseNum;
-	}
-
-	public void setStatement(double statement) {
-		this.statement = statement;
-	}
-
-	public void setPayment(double payment) {
-		this.payment = payment;
 	}
 
 	public void setMethod(String method) {

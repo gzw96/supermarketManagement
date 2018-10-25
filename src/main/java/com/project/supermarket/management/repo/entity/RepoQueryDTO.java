@@ -34,7 +34,7 @@ public class RepoQueryDTO {
 	private String status;
 	private String type;
 	
-	private Long roleId;
+	private String roleId;
 	private Long workNum;
 	private String userRealName;
 	
@@ -84,7 +84,7 @@ public class RepoQueryDTO {
 	public RepoQueryDTO init(RepoQueryDTO dto) {
 		Long num = dto.getWorkNum();
 		String uName = dto.getUserRealName();
-		Long uId;
+		String uId;
 		
 		/*SessionFactory sf = new Configuration().configure().buildSessionFactory();
         Session s = sf.openSession();
@@ -155,10 +155,10 @@ public class RepoQueryDTO {
 	public void setType(String type) {
 		this.type = type;
 	}
-	public Long getRoleId() {
+	public String getRoleId() {
 		return roleId;
 	}
-	public void setRoleId(Long roleId) {
+	public void setRoleId(String roleId) {
 		this.roleId = roleId;
 	}
 	public Long getWorkNum() {

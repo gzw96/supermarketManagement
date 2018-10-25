@@ -30,8 +30,7 @@ Ext.define('Admin.view.purchase.createsheet.CreatesheetGrid', {		//1.修改文�
         { text: 'ID', dataIndex: 'id', hidden: true },
         { text: '商品名', dataIndex: 'productName', width: 150 },
         { text: '商品编号', dataIndex: 'productNum', width: 150 },
-        { text: '商品规格', dataIndex: 'format', width: 150 },
-        { text: '零售价', dataIndex: 'retailPrice', width: 150 },
+        { text: '零售价', dataIndex: 'productPrice', width: 150 },
         {
             text: '进货价（请输入）',
             dataIndex: 'purchasePrice',

@@ -43,7 +43,7 @@ public class CreatesheetController {
 		Long workNum = root.getLong("workNum");
 		Date purchaseTime = new Date();
 		
-		Long userId = purchaseHistoryService.getPurchaseUserId(userRealName, workNum);
+		String userId = purchaseHistoryService.getPurchaseUserId(userRealName, workNum);
 		System.out.println(userId);
 		Long supplierId = purchaseHistoryService.getPurchaseSupplierId(supplierName);
 		Long repoId = purchaseHistoryService.getPurchaseRepoId(repoName);

@@ -1,2 +1,2 @@
 // @tag full-page
-// @require F:\springboot\supermarket1\supermarket\admin-dashboard\app.js
+// @require F:\springboot\supermarket2\supermarket\admin-dashboard\app.js

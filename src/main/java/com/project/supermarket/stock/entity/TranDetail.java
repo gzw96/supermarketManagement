@@ -1,5 +1,6 @@
 package com.project.supermarket.stock.entity;
 
+import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
@@ -14,47 +15,42 @@ import com.project.supermarket.management.product.entity.Product;
 @Entity
 @Table(name="tran_detail")
 public class TranDetail {
-	private Long id;
-	private Transhipment transhipment;
-	private Product product;
-	private Long tranNum;
-	
 	@Id
 	@GeneratedValue(strategy=GenerationType.IDENTITY)
+	private Long id;
+	@ManyToOne(cascade= {CascadeType.MERGE,CascadeType.REFRESH})
+	private Tranlog tranlog;
+	@ManyToOne(cascade= {CascadeType.MERGE,CascadeType.REFRESH})
+	private Product product;
+	private int tranNum;
+	
+	
 	public Long getId() {
 		return id;
 	}
-	
-	@ManyToOne
-	@JoinColumn(name="tranId")
-	public Transhipment getTranshipment() {
-		return transhipment;
+	public Tranlog getTranlog() {
+		return tranlog;
 	}
-	
-	@ManyToOne
-	@JoinColumn(name="productId")
 	public Product getProduct() {
 		return product;
 	}
-	
-	@Column(nullable=false)
-	public Long getTranNum() {
+	public int getTranNum() {
 		return tranNum;
 	}
 	
-	//setter
 	public void setId(Long id) {
 		this.id = id;
 	}
-	public void setTranshipment(Transhipment transhipment) {
-		this.transhipment = transhipment;
+	public void setTranlog(Tranlog tranlog) {
+		this.tranlog = tranlog;
 	}
 	public void setProduct(Product product) {
 		this.product = product;
 	}
-	public void setTranNum(Long tranNum) {
+	public void setTranNum(int tranNum) {
 		this.tranNum = tranNum;
 	}
+
 	
 	
 }

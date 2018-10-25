@@ -15,7 +15,7 @@ import com.project.supermarket.management.product.entity.Product;
 public class SaleDetail {
 	private Long id;
 	private Sale sale;
-	private Product product;
+	private Long productId;
 	private Long saleNum;
 	
 	@Id
@@ -29,10 +29,8 @@ public class SaleDetail {
 		return sale;
 	}
 	
-	@ManyToOne
-	@JoinColumn(name="productId")
-	public Product getProduct() {
-		return product;
+	public Long getProductId() {
+		return productId;
 	}
 	
 	@Column(nullable=false)
@@ -47,8 +45,8 @@ public class SaleDetail {
 	public void setSale(Sale sale) {
 		this.sale = sale;
 	}
-	public void setProduct(Product product) {
-		this.product = product;
+	public void setProductId(Long productId) {
+		this.productId = productId;
 	}
 	public void setSaleNum(Long saleNum) {
 		this.saleNum = saleNum;

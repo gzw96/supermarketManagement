@@ -1,5 +1,6 @@
 package com.project.supermarket.management.repo.controller;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +26,8 @@ import com.alibaba.fastjson.JSON;
 import com.project.supermarket.common.util.BeanUtils;
 import com.project.supermarket.common.web.ExtAjaxResponse;
 import com.project.supermarket.common.web.ExtjsPageRequest;
+import com.project.supermarket.management.brand.entity.Brand;
+import com.project.supermarket.management.product.entity.Product;
 import com.project.supermarket.management.repo.entity.Repo;
 import com.project.supermarket.management.repo.entity.RepoQueryDTO;
 import com.project.supermarket.management.repo.service.RepoServiceImpl;
@@ -73,6 +76,46 @@ public class RepoController {
 		}
 	}
 	
+	@GetMapping("/getUninit")
+	public Page<RepoQueryDTO> getUninit(ExtjsPageRequest pageable) 
+	{
+		RepoQueryDTO dto=new RepoQueryDTO();
+		Page<RepoQueryDTO> page=repoService.findAll(repoService.getNeedinit(), pageable.getPageable());
+		return 	page;
+	}
+	
+	@GetMapping("/getRepo")
+	public List<RepoQueryDTO> getRepo() 
+	{
+		List<RepoQueryDTO> resList = repoService.findAll(repoService.getRepo());	
+		List list = new ArrayList();
+		for(int i=0;i<resList.size();i++) {
+			Repo repo=new Repo();
+			BeanUtils.copyProperties(resList.get(i), repo);
+			Map<String,Object> map1=new HashMap<String, Object>();
+			map1.put("value", repo.getId());
+			map1.put("name", repo.getRepoName());
+			list.add(map1);
+		}
+		return list;
+	}
+	
+	@GetMapping("/setRepo")
+	public List<RepoQueryDTO> setRepo() 
+	{
+		List<RepoQueryDTO> resList = repoService.findAll(repoService.setRepo());	
+		List list = new ArrayList();
+		for(int i=0;i<resList.size();i++) {
+			Repo repo=new Repo();
+			BeanUtils.copyProperties(resList.get(i), repo);
+			Map<String,Object> map1=new HashMap<String, Object>();
+			map1.put("value", repo.getId());
+			map1.put("name", repo.getRepoName());
+			list.add(map1);
+		}
+		return list;
+	}
+	
 	@PutMapping(value="{id}",consumes=MediaType.APPLICATION_JSON_VALUE)
 	public ExtAjaxResponse update(@PathVariable("id") Long myId,@RequestBody RepoQueryDTO dto) {//修改
 		try {
@@ -85,7 +128,7 @@ public class RepoController {
 					Long num = dto.getWorkNum();
 					
 					
-					Long uId = repoService.getRepoUserId(uName, num);
+					String uId = repoService.getRepoUserId(uName, num);
 					repoService.save(repo);
 					repoService.updateRoleById(uId, myId);
 				}
@@ -111,17 +154,17 @@ public class RepoController {
 			//repo.init(repo);
 			Long num = repo.getWorkNum();
 			String uName = repo.getUserRealName();
-			Long uId;
+			String uId;
 			uId = repoService.getRepoUserId(uName, num);
 			
-	        System.out.println(uId);
+	        //System.out.println(uId);
 	        
 	        repo.setRoleId(uId);
 			Repo repo1 = new Repo();
 			repo.dtoToEntity(repo, repo1);
 			String repoName = repo.getRepoName();
 			
-			System.out.println(repoName);
+			//System.out.println(repoName);
 			
 			Repo newrepo = new Repo();
 			BeanUtils.copyProperties(repo1, newrepo);

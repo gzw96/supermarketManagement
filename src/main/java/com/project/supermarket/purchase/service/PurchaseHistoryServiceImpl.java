@@ -24,24 +24,24 @@ public interface PurchaseHistoryServiceImpl {
 	public void deleteAll(Long[] ids);
 	
 	//sql or hql 
-	public Long getPurchaseUserId(String userRealName,Long workNum);
+	public String getPurchaseUserId(String userRealName,Long workNum);
 	public Long getPurchaseRepoId(String repoName);
 	public Long getPurchaseSupplierId(String supplierName);
 	
-	public void updatePurchaseUser(Long userid,String purchaseNum);
+	public void updatePurchaseUser(String userid,String purchaseNum);
 	public List<User> findAllActiveUserRealName();
 	
 	public void updatePurchaseSupplier(Long supplierId,String purchaseNum);
 	public List<Supplier> findAllSupplier();
 	
 	public void updatePurchaseRepo(Long repoId,String purchaseNum);
-	public List<Repo> findAllRepo();
+	public List<String> findAllRepo();
 	
-	public void updateOperatorById(Long userid,Long purchaseId);
+	public void updateOperatorById(String userid,Long purchaseId);
 	public void updateRepoById(Long repoId,Long purchaseId);
 	public void updateSupplierById(Long supplierId,Long purchaseId);
 
-	public void updatePurchase(String purchaseNum,Double statement,Double payment,String method,String remark,Date date,Long userId,Long supplierId,Long repoId);
+	public void updatePurchase(String purchaseNum,Double statement,Double payment,String method,String remark,Date date,String userId,Long supplierId,Long repoId);
 
 	public Long getPurchaseIdByPurchaseNum(String purchaseNum);
 	

@@ -71,7 +71,7 @@ public class PurchaseHistoryService implements PurchaseHistoryServiceImpl{
 	}
 
 	@Override
-	public Long getPurchaseUserId(String userRealName, Long workNum) {
+	public String getPurchaseUserId(String userRealName, Long workNum) {
 		// TODO Auto-generated method stub
 		return purchaseHistoryRepository.getPurchaseUserId(userRealName, workNum);
 	}
@@ -89,7 +89,7 @@ public class PurchaseHistoryService implements PurchaseHistoryServiceImpl{
 	}
 
 	@Override
-	public void updatePurchaseUser(Long userid, String purchaseNum) {
+	public void updatePurchaseUser(String userid, String purchaseNum) {
 		// TODO Auto-generated method stub
 		purchaseHistoryRepository.updatePurchaseUser(userid, purchaseNum);
 	}
@@ -119,13 +119,13 @@ public class PurchaseHistoryService implements PurchaseHistoryServiceImpl{
 	}
 
 	@Override
-	public List<Repo> findAllRepo() {
+	public List<String> findAllRepo() {
 		// TODO Auto-generated method stub
 		return purchaseHistoryRepository.findAllRepo();
 	}
 
 	@Override
-	public void updateOperatorById(Long userid, Long purchaseId) {
+	public void updateOperatorById(String userid, Long purchaseId) {
 		// TODO Auto-generated method stub
 		purchaseHistoryRepository.updateOperatorById(userid, purchaseId);
 	}
@@ -144,7 +144,7 @@ public class PurchaseHistoryService implements PurchaseHistoryServiceImpl{
 
 	@Override
 	public void updatePurchase(String purchaseNum, Double statement, Double payment, String method, String remark,
-			Date date, Long userId, Long supplierId, Long repoId) {
+			Date date, String userId, Long supplierId, Long repoId) {
 		// TODO Auto-generated method stub
 		purchaseHistoryRepository.updatePurchase(purchaseNum, statement, payment, method, remark, date, userId, supplierId, repoId);
 		

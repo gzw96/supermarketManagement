@@ -65,7 +65,7 @@ public class PurchaseDetailController {
 	@RequestMapping(method=RequestMethod.POST,value="/getproductnums")
 	@ResponseBody
 	public String getAllProducts() {
-		List<Product> nameString = purchaseDetailService.findAllProduct();
+		List<String> nameString = purchaseDetailService.findAllProduct();
 		Map<String, Object> map = new HashMap<>();
 		map.put("root", nameString);
 		

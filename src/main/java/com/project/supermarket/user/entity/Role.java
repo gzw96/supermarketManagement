@@ -8,47 +8,54 @@ import javax.persistence.Entity;
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
 import javax.persistence.FetchType;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.JoinTable;
 import javax.persistence.ManyToMany;
 import javax.persistence.Table;
 import javax.persistence.JoinColumn;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.project.supermarket.common.bean.RoleName;
 
 @Entity
-@Table(name="role")
+@Table(name="act_id_group")
 public class Role {
-	private Long id;
+	private String id;
 	private RoleName roleName;
+	private String remark;
 	private Set<User> user;
 	
 	@Id
-	@GeneratedValue(strategy=GenerationType.IDENTITY)
-	public Long getId() {
+	@Column(name = "ID_")
+	public String getId() {
 		return id;
 	}
 	
 	@Enumerated(EnumType.STRING)
-	@Column(nullable=false,unique=true)
+	@Column(name="NAME_",nullable=false,unique=true)
 	public RoleName getRoleName() {
 		return roleName;
 	}
 
-	@ManyToMany(cascade=CascadeType.ALL,fetch=FetchType.EAGER)
+	@ManyToMany(cascade=CascadeType.MERGE,fetch=FetchType.EAGER)
     @JoinTable(
-            name="membership",
-            joinColumns=@JoinColumn(name="roleId"),
-            inverseJoinColumns=@JoinColumn(name="userId")
-    )    
+            name="act_id_membership",
+            joinColumns=@JoinColumn(name="GROUP_ID_"),
+            inverseJoinColumns=@JoinColumn(name="USER_ID_")
+    )   
+	@JsonIgnore
 	public Set<User> getUser() {
 		return user;
 	}
 
+	
+	
+	public String getRemark() {
+		return remark;
+	}
+
 	//setter
-	public void setId(Long id) {
+	public void setId(String id) {
 		this.id = id;
 	}
 
@@ -59,6 +66,11 @@ public class Role {
 	public void setUser(Set<User> user) {
 		this.user = user;
 	}
+
+	public void setRemark(String remark) {
+		this.remark = remark;
+	}
+	
 	
 	
 	

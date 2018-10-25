@@ -59,7 +59,7 @@ Ext.define('Admin.view.dashboard.supplier.SupplierViewController', {
 		var record = store.getById(values.id);//获取id获取store中的数据
 		if (form.isValid()) {
 			record.set(values);//rest put 
-			//store.load();
+			store.load();
 			win.close();
 		}
 		else {

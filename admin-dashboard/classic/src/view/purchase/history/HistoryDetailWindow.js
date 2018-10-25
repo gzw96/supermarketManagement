@@ -24,9 +24,7 @@ Ext.define('Aria.view.purchase.history.HistoryDetailWindow', {
                 { xtype: 'gridcolumn', cls: 'content-column', dataIndex: 'purchaseNum', hidden: true, text: '进货单号' },
                 { xtype: 'gridcolumn', cls: 'content-column', dataIndex: 'productNum', text: '产品编号', flex: 1 },
                 { xtype: 'gridcolumn', cls: 'content-column', dataIndex: 'productName', text: '产品名称', flex: 1 },
-                { xtype: 'gridcolumn', cls: 'content-column', dataIndex: 'format', text: '产品规格', flex: 1 },
                 { xtype: 'gridcolumn', cls: 'content-column', dataIndex: 'purchasePrice', text: '采购价', flex: 1 },
-                { xtype: 'gridcolumn', cls: 'content-column', dataIndex: 'retailPrice', text: '零售价', flex: 1 },
                 { xtype: 'gridcolumn', cls: 'content-column', dataIndex: 'purchaseProductNum', text: '采购数量', flex: 1 },
                 { xtype: 'gridcolumn', cls: 'content-column', dataIndex: 'purchaseStatus', text: '采购状态', flex: 1 },
                 {
